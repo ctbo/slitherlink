@@ -70,6 +70,9 @@ stateFromProblem p = State {constraints = p
 notZero :: Constraint -> Bool
 notZero c = c /= Exactly 0
 
+decrementConstraint :: Constraint -> Constraint
+decrementConstraint Unconstrained = Unconstrained
+decrementConstraint (Exactly x) = Exactly (x - 1)
 
 data Direction = Direction { delta, lookRight, lookLeft :: (Int, Int) }
 directions :: [Direction]
@@ -84,6 +87,10 @@ moveDirection dir state = do
           let to = position state .+ delta dir
           unless (inRange (bounds (dots state)) to) Nothing
           when (dots state ! to) Nothing
+          let ll = lookLeft dir
+          let lr = lookRight dir
+          unless (notZero (constraints state ! lr)) Nothing
+--          unless (notZero (constraints state ! ll)) Nothing
           return (State {constraints = constraints state
                         ,dots = (dots state) // [(to, True)]
                         ,position = to

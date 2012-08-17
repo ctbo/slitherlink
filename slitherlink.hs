@@ -47,6 +47,11 @@ readProblem s = do
             let rows = length pl
             return $ listArray ((0, 0), (rows-1, columns-1)) $ concat pl 
 
+type Dots = Array (Int, Int) Bool
+emptyDots :: Int -> Int -> Dots
+emptyDots r c = listArray ((0, 0), (r-1, c-1)) (repeat False)
+
+
 
 data LineState = Line | NoLine | Unknown deriving (Eq, Ord, Enum, Show, Bounded)
 

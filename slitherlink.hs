@@ -1,13 +1,15 @@
+import Data.Array.IArray
+
+import Control.Monad
 import Control.Monad.Instances
 import Data.List (transpose)
 
 data Constraint = Unconstrained | Exactly Int
-type Problem = [[Constraint]]
 
 sampleProblemString = unlines [".22.."
                               ,"..13."
                               ,"313.2"
-                              ,"....."
+                              ,"...."
                               ,".2.23"
                               ]
 
@@ -18,7 +20,7 @@ showConstraint (Exactly x) = head $ show x
 instance Show Constraint where
     show = (:[]) . showConstraint         
 
-showProblem :: Problem -> String
+showProblem :: ProblemList -> String
 showProblem = unlines . (map . map) showConstraint
 
 readConstraint :: Char -> Either String Constraint
@@ -29,8 +31,22 @@ readConstraint '2' = Right $ Exactly 2
 readConstraint '3' = Right $ Exactly 3
 readConstraint c = Left $ "Invalid character " ++ show c ++ "."
 
-readProblem ::  String -> Either String Problem
-readProblem = (mapM . mapM) readConstraint . lines
+type ProblemList = [[Constraint]]
+
+readProblemList ::  String -> Either String ProblemList
+readProblemList = (mapM . mapM) readConstraint . lines
+
+type Problem = Array (Int, Int) Constraint
+readProblem :: String -> Either String Problem
+readProblem s = do
+            pl <- readProblemList s
+            when (null pl) $ Left "Problem is empty."
+            let columns = length $ head pl
+            when (columns == 0) $ Left "Problem starts with an empty line."
+            unless (all (\x -> length x == columns) pl) $ Left "Problem not rectangular."
+            let rows = length pl
+            return $ listArray ((1, 1), (rows, columns)) $ concat pl 
+
 
 data LineState = Line | NoLine | Unknown deriving (Eq, Ord, Enum, Show, Bounded)
 

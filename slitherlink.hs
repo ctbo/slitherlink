@@ -20,8 +20,8 @@ showConstraint (Exactly x) = head $ show x
 instance Show Constraint where
     show = (:[]) . showConstraint         
 
-showProblem :: ProblemList -> String
-showProblem = unlines . (map . map) showConstraint
+showProblemList :: ProblemList -> String
+showProblemList = unlines . (map . map) showConstraint
 
 readConstraint :: Char -> Either String Constraint
 readConstraint '.' = Right Unconstrained

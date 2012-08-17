@@ -7,7 +7,7 @@ import Data.List (transpose)
 (.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
 (a, b) .+ (c, d) = (a+c, b+d)
 
-data Constraint = Unconstrained | Exactly Int
+data Constraint = Unconstrained | Exactly Int deriving (Eq)
 
 sampleProblemString = unlines [".22.."
                               ,"..13."
@@ -58,17 +58,34 @@ emptyDots p = listArray ((0, 0), p) (repeat False)
 
 data State = State { constraints :: Problem
                    , dots :: Dots
+                   , position :: (Int, Int)
                    } deriving (Show)
 
 stateFromProblem :: Problem -> State
-stateFromProblem p = State {constraints = p,
-                            dots = emptyDots (snd (bounds p) .+ (1, 1))}
+stateFromProblem p = State {constraints = p
+                           ,dots = emptyDots (snd (bounds p) .+ (1, 1))
+                           ,position = (0, 0)
+                           }
 
-moveDelta :: State -> (Int, Int) -> (Int, Int) -> Maybe State
-moveDelta state from delta = do
-          let to = from .+ delta
+notZero :: Constraint -> Bool
+notZero c = c /= Exactly 0
+
+
+data Direction = Direction { delta, lookRight, lookLeft :: (Int, Int) }
+directions :: [Direction]
+directions = [ Direction (0, 1) (0, 0)  (-1, 0)
+             , Direction (1, 0) (0, -1) (0, 0)
+             , Direction (0,-1) (-1,-1) (0, -1)
+             , Direction (-1,0) (-1, 0) (-1,-1)
+             ]
+
+moveDirection :: Direction -> State -> Maybe State
+moveDirection dir state = do
+          let to = position state .+ delta dir
           unless (inRange (bounds (dots state)) to) Nothing
           when (dots state ! to) Nothing
-          return (State {constraints = constraints state,
-                         dots = (dots state) // [(to, True)]})
+          return (State {constraints = constraints state
+                        ,dots = (dots state) // [(to, True)]
+                        ,position = to
+                        })
 

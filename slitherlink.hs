@@ -43,7 +43,7 @@ readProblem s = do
             when (null pl) $ Left "Problem is empty."
             let columns = length $ head pl
             when (columns == 0) $ Left "Problem starts with an empty line."
-            unless (all (\x -> length x == columns) pl) $ Left "Problem not rectangular."
+            unless (all ((== columns) . length) pl) $ Left "Problem not rectangular."
             let rows = length pl
             return $ listArray ((1, 1), (rows, columns)) $ concat pl 
 

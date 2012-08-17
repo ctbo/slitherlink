@@ -45,7 +45,7 @@ readProblem s = do
             when (columns == 0) $ Left "Problem starts with an empty line."
             unless (all ((== columns) . length) pl) $ Left "Problem not rectangular."
             let rows = length pl
-            return $ listArray ((1, 1), (rows, columns)) $ concat pl 
+            return $ listArray ((0, 0), (rows-1, columns-1)) $ concat pl 
 
 
 data LineState = Line | NoLine | Unknown deriving (Eq, Ord, Enum, Show, Bounded)

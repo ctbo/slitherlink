@@ -4,12 +4,15 @@ import Control.Monad
 import Control.Monad.Instances
 import Data.List (transpose)
 
+(.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
+(a, b) .+ (c, d) = (a+c, b+d)
+
 data Constraint = Unconstrained | Exactly Int
 
 sampleProblemString = unlines [".22.."
                               ,"..13."
                               ,"313.2"
-                              ,"...."
+                              ,"....."
                               ,".2.23"
                               ]
 
@@ -47,7 +50,25 @@ readProblem s = do
             let rows = length pl
             return $ listArray ((0, 0), (rows-1, columns-1)) $ concat pl 
 
+sampleProblem = case readProblem sampleProblemString of Right x -> x
+
 type Dots = Array (Int, Int) Bool
-emptyDots :: Int -> Int -> Dots
-emptyDots r c = listArray ((0, 0), (r-1, c-1)) (repeat False)
+emptyDots :: (Int, Int) -> Dots
+emptyDots p = listArray ((0, 0), p) (repeat False)
+
+data State = State { constraints :: Problem
+                   , dots :: Dots
+                   } deriving (Show)
+
+stateFromProblem :: Problem -> State
+stateFromProblem p = State {constraints = p,
+                            dots = emptyDots (snd (bounds p) .+ (1, 1))}
+
+moveDelta :: State -> (Int, Int) -> (Int, Int) -> Maybe State
+moveDelta state from delta = do
+          let to = from .+ delta
+          unless (inRange (bounds (dots state)) to) Nothing
+          when (dots state ! to) Nothing
+          return (State {constraints = constraints state,
+                         dots = (dots state) // [(to, True)]})
 

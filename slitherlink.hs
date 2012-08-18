@@ -62,6 +62,18 @@ data State = State { constraints :: Problem
                    , goal :: (Int, Int)
                    } deriving (Show)
 
+showState :: State -> String
+showState state = unlines $ map line [r0 .. rn] ++ [hLine (rn+1)]
+  where ((r0, c0), (rn, cn)) = bounds $ constraints state
+        line r = hLine r ++ "\n" ++ vLine r
+        hLine r = concat $ map (hCell r) [c0 .. cn] ++ [dot r (cn+1)]
+        hCell r c = (dot r c) ++
+                    (if (dots state ! (r, c)) && (dots state ! (r, c+1)) then "-" else " ")
+        dot r c = if dots state ! (r, c) then "+" else " "
+        vLine r = concat $ map (vCell r) [c0 .. cn]
+        vCell r c = (if (dots state ! (r, c)) && (dots state ! (r+1, c)) then "|" else " ") ++
+                    (show $ constraints state ! (r, c))
+
 stateFromProblem :: Problem -> (Int, Int) -> State
 stateFromProblem c p = State { constraints = c
                              , dots = emptyDots (snd (bounds c) .+ (1, 1))
@@ -117,3 +129,7 @@ solve state = foldl f Nothing directions
                        then return state'
                        else Nothing
                 else solve state'
+{-
+main = do
+     putStrLn $ show $ solve $ stateFromProblem sampleProblem (4,4)
+-}

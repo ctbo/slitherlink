@@ -59,13 +59,27 @@ emptyDots p = listArray ((0, 0), p) (repeat False)
 data State = State { constraints :: Problem
                    , dots :: Dots
                    , position :: (Int, Int)
+                   , goal :: (Int, Int)
                    } deriving (Show)
 
-stateFromProblem :: Problem -> State
-stateFromProblem p = State {constraints = p
-                           ,dots = emptyDots (snd (bounds p) .+ (1, 1))
-                           ,position = (0, 0)
-                           }
+stateFromProblem :: Problem -> (Int, Int) -> State
+stateFromProblem c p = State { constraints = c
+                             , dots = emptyDots (snd (bounds c) .+ (1, 1))
+                             , position = p
+                             , goal = p
+                             }
+
+decrement :: (Int, Int) -> State -> Maybe State
+decrement i state = 
+  if not (inRange (bounds (constraints state)) i) then Just state else
+  case constraints state ! i of
+     Unconstrained -> Just state
+     Exactly 0 -> Nothing
+     Exactly n -> Just State { constraints = (constraints state) // [(i, Exactly (n-1))]
+                             , dots = dots state
+                             , position = position state
+                             , goal = goal state
+                             }
 
 data Direction = Direction { delta, lookRight, lookLeft :: (Int, Int) }
 directions :: [Direction]
@@ -82,18 +96,24 @@ moveDirection dir state = do
           when (dots state ! to) Nothing
           state' <- decrement (position state .+ lookLeft dir) state
           state'' <- decrement (position state .+ lookRight dir) state
-          return (State {constraints = constraints state''
-                        ,dots = (dots state'') // [(to, True)]
-                        ,position = to
+          return (State { constraints = constraints state''
+                        , dots = (dots state'') // [(to, True)]
+                        , position = to
+                        , goal = goal state''
                         })
 
-decrement :: (Int, Int) -> State -> Maybe State
-decrement i state = 
-  if not (inRange (bounds (constraints state)) i) then Just state else
-  case constraints state ! i of
-     Unconstrained -> Just state
-     Exactly 0 -> Nothing
-     Exactly n -> Just State { constraints = (constraints state) // [(i, Exactly (n-1))]
-                             , dots = dots state
-                             , position = position state
-                             }
+onlyZeros :: Problem -> Bool
+onlyZeros p = all (\x -> x == Unconstrained || x == Exactly 0) (elems p)
+
+
+solve :: State -> Maybe State
+solve state = foldl f Nothing directions
+   where f solution dir = case solution of
+            Just x -> Just x
+            Nothing -> do
+              state' <- moveDirection dir state
+              if goal state' == position state'
+                then if onlyZeros (constraints state')
+                       then return state'
+                       else Nothing
+                else solve state'

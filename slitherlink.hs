@@ -4,11 +4,7 @@ import Control.Monad
 import Control.Monad.Instances
 import Data.List (transpose)
 
-(.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
-(a, b) .+ (c, d) = (a+c, b+d)
-
-data Constraint = Unconstrained | Exactly Int deriving (Eq)
-
+sampleProblemString :: String
 sampleProblemString = unlines [".22.."
                               ,"..13."
                               ,"313.2"
@@ -16,15 +12,10 @@ sampleProblemString = unlines [".22.."
                               ,".2.23"
                               ]
 
-showConstraint :: Constraint -> Char
-showConstraint Unconstrained = '.'
-showConstraint (Exactly x) = head $ show x
-
+data Constraint = Unconstrained | Exactly Int deriving (Eq)
 instance Show Constraint where
-    show = (:[]) . showConstraint         
-
-showProblemList :: ProblemList -> String
-showProblemList = unlines . (map . map) showConstraint
+    show Unconstrained = "."
+    show (Exactly x) = show x
 
 readConstraint :: Char -> Either String Constraint
 readConstraint '.' = Right Unconstrained
@@ -50,7 +41,11 @@ readProblem s = do
             let rows = length pl
             return $ listArray ((0, 0), (rows-1, columns-1)) $ concat pl 
 
+sampleProblem :: Problem
 sampleProblem = case readProblem sampleProblemString of Right x -> x
+
+(.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
+(a, b) .+ (c, d) = (a+c, b+d)
 
 type Dots = Array (Int, Int) Bool
 emptyDots :: (Int, Int) -> Dots
@@ -150,5 +145,7 @@ solve problem = do
                                then return state'
                                else Nothing
                         else solve' state'
+
+main :: IO ()
 main = do
      putStr $ showMaybeState $ solve sampleProblem

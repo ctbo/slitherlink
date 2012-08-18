@@ -60,19 +60,22 @@ data State = State { constraints :: Problem
                    , dots :: Dots
                    , position :: (Int, Int)
                    , goal :: (Int, Int)
+                   , solution :: [((Int, Int),(Int, Int))]
                    } deriving (Show)
 
 showState :: State -> String
-showState state = unlines $ map line [r0 .. rn] ++ [hLine (rn+1)]
+showState state = unlines $ map line [r0 .. rn] ++ [hLines (rn+1)]
   where ((r0, c0), (rn, cn)) = bounds $ constraints state
-        line r = hLine r ++ "\n" ++ vLine r
-        hLine r = concat $ map (hCell r) [c0 .. cn] ++ [dot r (cn+1)]
+        line r = hLines r ++ "\n" ++ vLines r
+        hLines r = concat $ map (hCell r) [c0 .. cn] ++ [dot r (cn+1)]
         hCell r c = (dot r c) ++
-                    (if (dots state ! (r, c)) && (dots state ! (r, c+1)) then "-" else " ")
+                    (if lineBetween (r, c) (r, c+1) then "-" else " ")
         dot r c = if dots state ! (r, c) then "+" else " "
-        vLine r = concat $ map (vCell r) [c0 .. cn]
-        vCell r c = (if (dots state ! (r, c)) && (dots state ! (r+1, c)) then "|" else " ") ++
+        vLines r = concat $ map (vCell r) [c0 .. cn] ++ [vLine r (cn+1)]
+        vCell r c = (vLine r c) ++
                     (show $ constraints state ! (r, c))
+        vLine r c = if lineBetween (r, c) (r+1, c) then "|" else " "
+        lineBetween p q = (p, q) `elem` solution state || (q, p) `elem` solution state
 
 showMaybeState :: Maybe State -> String
 showMaybeState Nothing = "Nothing\n"
@@ -83,6 +86,7 @@ stateFromProblem c p = State { constraints = c
                              , dots = emptyDots (snd (bounds c) .+ (1, 1))
                              , position = p
                              , goal = p
+                             , solution = []
                              }
 
 decrement :: (Int, Int) -> State -> Maybe State
@@ -95,6 +99,7 @@ decrement i state =
                              , dots = dots state
                              , position = position state
                              , goal = goal state
+                             , solution = solution state
                              }
 
 data Direction = Direction { delta, lookRight, lookLeft :: (Int, Int) }
@@ -116,6 +121,7 @@ moveDirection dir state = do
                         , dots = (dots state'') // [(to, True)]
                         , position = to
                         , goal = goal state''
+                        , solution = (position state, to) : solution state
                         })
 
 onlyZeros :: Problem -> Bool
@@ -134,4 +140,4 @@ solve state = foldl f Nothing directions
                        else Nothing
                 else solve state'
 main = do
-     putStrLn $ show $ solve $ stateFromProblem sampleProblem (4,4)
+     putStr $ showMaybeState $ solve $ stateFromProblem sampleProblem (4,4)

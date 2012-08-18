@@ -70,10 +70,6 @@ stateFromProblem p = State {constraints = p
 notZero :: Constraint -> Bool
 notZero c = c /= Exactly 0
 
-decrementConstraint :: Constraint -> Constraint
-decrementConstraint Unconstrained = Unconstrained
-decrementConstraint (Exactly x) = Exactly (x - 1)
-
 data Direction = Direction { delta, lookRight, lookLeft :: (Int, Int) }
 directions :: [Direction]
 directions = [ Direction (0, 1) (0, 0)  (-1, 0)
@@ -96,3 +92,13 @@ moveDirection dir state = do
                         ,position = to
                         })
 
+decrement :: (Int, Int) -> State -> Maybe State
+decrement i state = 
+  if not (inRange (bounds (constraints state)) i) then Just state else
+  case constraints state ! i of
+     Unconstrained -> Just state
+     Exactly 0 -> Nothing
+     Exactly n -> Just State { constraints = (constraints state) // [(i, Exactly (n-1))]
+                             , dots = dots state
+                             , position = position state
+                             }

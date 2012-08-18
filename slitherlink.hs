@@ -74,6 +74,10 @@ showState state = unlines $ map line [r0 .. rn] ++ [hLine (rn+1)]
         vCell r c = (if (dots state ! (r, c)) && (dots state ! (r+1, c)) then "|" else " ") ++
                     (show $ constraints state ! (r, c))
 
+showMaybeState :: Maybe State -> String
+showMaybeState Nothing = "Nothing\n"
+showMaybeState (Just state) = showState state
+
 stateFromProblem :: Problem -> (Int, Int) -> State
 stateFromProblem c p = State { constraints = c
                              , dots = emptyDots (snd (bounds c) .+ (1, 1))
@@ -107,7 +111,7 @@ moveDirection dir state = do
           unless (inRange (bounds (dots state)) to) Nothing
           when (dots state ! to) Nothing
           state' <- decrement (position state .+ lookLeft dir) state
-          state'' <- decrement (position state .+ lookRight dir) state
+          state'' <- decrement (position state' .+ lookRight dir) state'
           return (State { constraints = constraints state''
                         , dots = (dots state'') // [(to, True)]
                         , position = to
@@ -116,7 +120,7 @@ moveDirection dir state = do
 
 onlyZeros :: Problem -> Bool
 onlyZeros p = all (\x -> x == Unconstrained || x == Exactly 0) (elems p)
-
+-- onlyZeros _ = True
 
 solve :: State -> Maybe State
 solve state = foldl f Nothing directions
@@ -129,7 +133,5 @@ solve state = foldl f Nothing directions
                        then return state'
                        else Nothing
                 else solve state'
-{-
 main = do
      putStrLn $ show $ solve $ stateFromProblem sampleProblem (4,4)
--}

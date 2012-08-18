@@ -60,7 +60,7 @@ data State = State { constraints :: Problem
                    , dots :: Dots
                    , position :: (Int, Int)
                    , goal :: (Int, Int)
-                   , solution :: [((Int, Int),(Int, Int))]
+                   , solutionLines :: [((Int, Int),(Int, Int))]
                    } deriving (Show)
 
 showState :: State -> String
@@ -75,7 +75,7 @@ showState state = unlines $ map line [r0 .. rn] ++ [hLines (rn+1)]
         vCell r c = (vLine r c) ++
                     (show $ constraints state ! (r, c))
         vLine r c = if lineBetween (r, c) (r+1, c) then "|" else " "
-        lineBetween p q = (p, q) `elem` solution state || (q, p) `elem` solution state
+        lineBetween p q = (p, q) `elem` solutionLines state || (q, p) `elem` solutionLines state
 
 showMaybeState :: Maybe State -> String
 showMaybeState Nothing = "Nothing\n"
@@ -86,7 +86,7 @@ stateFromProblem c p = State { constraints = c
                              , dots = emptyDots (snd (bounds c) .+ (1, 1))
                              , position = p
                              , goal = p
-                             , solution = []
+                             , solutionLines = []
                              }
 
 decrement :: (Int, Int) -> State -> Maybe State
@@ -99,7 +99,7 @@ decrement i state =
                              , dots = dots state
                              , position = position state
                              , goal = goal state
-                             , solution = solution state
+                             , solutionLines = solutionLines state
                              }
 
 data Direction = Direction { delta, lookRight, lookLeft :: (Int, Int) }
@@ -121,23 +121,34 @@ moveDirection dir state = do
                         , dots = (dots state'') // [(to, True)]
                         , position = to
                         , goal = goal state''
-                        , solution = (position state, to) : solution state
+                        , solutionLines = (position state, to) : solutionLines state
                         })
 
 onlyZeros :: Problem -> Bool
 onlyZeros p = all (\x -> x == Unconstrained || x == Exactly 0) (elems p)
--- onlyZeros _ = True
 
-solve :: State -> Maybe State
-solve state = foldl f Nothing directions
-   where f solution dir = case solution of
-            Just x -> Just x
-            Nothing -> do
-              state' <- moveDirection dir state
-              if goal state' == position state'
-                then if onlyZeros (constraints state')
-                       then return state'
-                       else Nothing
-                else solve state'
+solve :: Problem -> Maybe State
+solve problem = do
+  solution <- foldl startingPos Nothing (indices problem)
+  return (State { constraints = problem
+                , dots = dots solution
+                , position = position solution
+                , goal = goal solution
+                , solutionLines = solutionLines solution
+                })
+  where startingPos solution pos = case solution of
+                                     Just x -> Just x
+                                     Nothing -> solve' $ stateFromProblem problem pos
+
+        solve' state = foldl f Nothing directions
+           where f solution dir = case solution of
+                    Just x -> Just x
+                    Nothing -> do
+                      state' <- moveDirection dir state
+                      if goal state' == position state'
+                        then if onlyZeros (constraints state')
+                               then return state'
+                               else Nothing
+                        else solve' state'
 main = do
-     putStr $ showMaybeState $ solve $ stateFromProblem sampleProblem (4,4)
+     putStr $ showMaybeState $ solve sampleProblem

@@ -73,7 +73,7 @@ showState state = unlines $ map line [r0 .. rn] ++ [hLines (rn+1)]
         lineBetween p q = (p, q) `elem` solutionLines state || (q, p) `elem` solutionLines state
 
 showMaybeState :: Maybe State -> String
-showMaybeState Nothing = "Nothing\n"
+showMaybeState Nothing = "No solution.\n"
 showMaybeState (Just state) = showState state
 
 stateFromProblem :: Problem -> (Int, Int) -> State

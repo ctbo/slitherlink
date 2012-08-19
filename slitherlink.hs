@@ -4,6 +4,8 @@ import Control.Monad
 import Control.Monad.Instances
 import Data.List (transpose)
 
+import System.Environment
+
 sampleProblemString :: String
 sampleProblemString = unlines [".22.."
                               ,"..13."
@@ -148,4 +150,8 @@ solve problem = do
 
 main :: IO ()
 main = do
-     putStr $ showMaybeState $ solve sampleProblem
+     [filename] <- getArgs
+     pString <- readFile filename
+     case readProblem pString of
+       Left e -> putStrLn e
+       Right p -> putStrLn $ showMaybeState $ solve p

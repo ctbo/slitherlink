@@ -84,7 +84,7 @@ decrement i state =
      Box Unconstrained -> Just state
      Box (Exactly 0)     -> Nothing
      Box (Exactly n)     -> Just (state // [(i, Box (Exactly (n-1)))])
-     otherwise     -> Nothing
+     otherwise           -> Nothing
 
 type Direction = (Int, Int)
 directions :: [Direction]
@@ -126,11 +126,12 @@ solve problem = solve' (0,0) (0,0) (stateFromProblem problem)
                     Just x -> Just x
                     Nothing -> do
                       state' <- move pos dir state
-                      if pos == goal
+                      let newPos = pos .+ dir .+ dir
+                      if newPos == goal
                         then if onlyZeros state'
                                then return state'
                                else Nothing
-                        else solve' goal (pos .+ dir) state'
+                        else solve' goal (newPos) state'
 
 main :: IO ()
 main = do

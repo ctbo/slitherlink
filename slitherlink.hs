@@ -5,14 +5,6 @@ import Control.Monad.Instances()
 
 import System.Environment
 
-sampleProblemString :: String
-sampleProblemString = unlines [".22.."
-                              ,"..13."
-                              ,"313.2"
-                              ,"....."
-                              ,".2.23"
-                              ]
-
 data Constraint = Unconstrained | Exactly Int deriving (Eq)
 instance Show Constraint where
     show Unconstrained = "."
@@ -41,11 +33,6 @@ readProblem s = do
             unless (all ((== columns) . length) pl) $ Left "Problem not rectangular."
             let rows = length pl
             return $ listArray ((0, 0), (rows-1, columns-1)) $ concat pl 
-
-sampleProblem :: Problem
-sampleProblem = case readProblem sampleProblemString of 
-  Right x -> x
-  Left _ -> undefined
 
 data CellState = Dot Bool
                | Line Bool
@@ -140,3 +127,20 @@ main = do
      case readProblem pString of
        Left e -> putStrLn e
        Right p -> putStrLn $ showMaybeState $ solve p
+
+
+
+
+sampleProblemString :: String
+sampleProblemString = unlines [".22.."
+                              ,"..13."
+                              ,"313.2"
+                              ,"....."
+                              ,".2.23"
+                              ]
+
+sampleProblem :: Problem
+sampleProblem = case readProblem sampleProblemString of 
+  Right x -> x
+  Left _ -> undefined -- can't happen
+

@@ -46,107 +46,91 @@ readProblem s = do
 sampleProblem :: Problem
 sampleProblem = case readProblem sampleProblemString of Right x -> x
 
-(.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
-(a, b) .+ (c, d) = (a+c, b+d)
-
-type Dots = Array (Int, Int) Bool
-emptyDots :: (Int, Int) -> Dots
-emptyDots p = listArray ((0, 0), p) (repeat False)
-
-data State = State { constraints :: Problem
-                   , dots :: Dots
-                   , position :: (Int, Int)
-                   , goal :: (Int, Int)
-                   , solutionLines :: [((Int, Int),(Int, Int))]
-                   } deriving (Show)
+data CellState = Dot Bool
+               | Line Bool
+               | Box Constraint deriving (Eq, Show)
+type State =  Array (Int, Int) CellState
 
 showState :: State -> String
-showState state = unlines $ map line [r0 .. rn] ++ [hLines (rn+1)]
-  where ((r0, c0), (rn, cn)) = bounds $ constraints state
-        line r = hLines r ++ "\n" ++ vLines r
-        hLines r = concat $ map (hCell r) [c0 .. cn] ++ [dot r (cn+1)]
-        hCell r c = (dot r c) ++
-                    (if lineBetween (r, c) (r, c+1) then "-" else " ")
-        dot r c = if dots state ! (r, c) then "+" else " "
-        vLines r = concat $ map (vCell r) [c0 .. cn] ++ [vLine r (cn+1)]
-        vCell r c = (vLine r c) ++
-                    (show $ constraints state ! (r, c))
-        vLine r c = if lineBetween (r, c) (r+1, c) then "|" else " "
-        lineBetween p q = (p, q) `elem` solutionLines state || (q, p) `elem` solutionLines state
+showState state = unlines $ map oneLine [r0 .. rn]
+  where ((r0, c0), (rn, cn)) = bounds state
+        oneLine r = concat $ map (oneCell r) [c0 .. cn]
+        oneCell r c = showCell (isVertical r) $ state ! (r, c)
+        isVertical = odd
+        showCell vertical s = case s of
+          Dot x  -> if x then "+" else " "
+          Line x -> if x then (if vertical then "|" else "-") else " "
+          Box x  -> show x
 
 showMaybeState :: Maybe State -> String
 showMaybeState Nothing = "No solution.\n"
 showMaybeState (Just state) = showState state
 
-stateFromProblem :: Problem -> (Int, Int) -> State
-stateFromProblem c p = State { constraints = c
-                             , dots = emptyDots (snd (bounds c) .+ (1, 1))
-                             , position = p
-                             , goal = p
-                             , solutionLines = []
-                             }
+stateFromProblem :: Problem -> State
+stateFromProblem p = array ((0, 0), (rows, columns)) $ dots ++ lines ++ constraints
+  where ((0, 0), (rn, cn)) = bounds p
+        rows    = 2*rn + 2
+        columns = 2*cn + 2
+        dots = [((r, c), Dot False) | r <- [0, 2 .. 2*rn+2], c <- [0, 2 .. 2*cn+2]]
+        lines = hlines ++ vlines
+        hlines = [((r, c), Line False) | r <- [0, 2 .. 2*rn+2], c <- [1, 3 .. 2*cn+1]]
+        vlines = [((r, c), Line False) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
+        constraints = [((2*r+1, 2*c+1), Box (p!(r, c))) | r <- [0 .. rn], c <- [0 .. cn]]
 
 decrement :: (Int, Int) -> State -> Maybe State
 decrement i state = 
-  if not (inRange (bounds (constraints state)) i) then Just state else
-  case constraints state ! i of
-     Unconstrained -> Just state
-     Exactly 0 -> Nothing
-     Exactly n -> Just State { constraints = (constraints state) // [(i, Exactly (n-1))]
-                             , dots = dots state
-                             , position = position state
-                             , goal = goal state
-                             , solutionLines = solutionLines state
-                             }
+  if not (inRange (bounds state) i) then Just state else
+  case state ! i of
+     Box Unconstrained -> Just state
+     Box (Exactly 0)     -> Nothing
+     Box (Exactly n)     -> Just (state // [(i, Box (Exactly (n-1)))])
+     otherwise     -> Nothing
 
-data Direction = Direction { delta, lookRight, lookLeft :: (Int, Int) }
+type Direction = (Int, Int)
 directions :: [Direction]
-directions = [ Direction (0, 1) (0, 0)  (-1, 0)
-             , Direction (1, 0) (0, -1) (0, 0)
-             , Direction (0,-1) (-1,-1) (0, -1)
-             , Direction (-1,0) (-1, 0) (-1,-1)
+directions = [ (0, 1)
+             , (1, 0)
+             , (0,-1)
+             , (-1,0)
              ]
+turnLeft :: (Int, Int) -> (Int, Int)
+turnLeft (x, y) = (-y, x)
 
-moveDirection :: Direction -> State -> Maybe State
-moveDirection dir state = do
-          let to = position state .+ delta dir
-          unless (inRange (bounds (dots state)) to) Nothing
-          when (dots state ! to) Nothing
-          state' <- decrement (position state .+ lookLeft dir) state
-          state'' <- decrement (position state' .+ lookRight dir) state'
-          return (State { constraints = constraints state''
-                        , dots = (dots state'') // [(to, True)]
-                        , position = to
-                        , goal = goal state''
-                        , solutionLines = (position state, to) : solutionLines state
-                        })
+turnRight :: (Int, Int) -> (Int, Int)
+turnRight (x, y) = (y, -x)
 
-onlyZeros :: Problem -> Bool
-onlyZeros p = all (\x -> x == Unconstrained || x == Exactly 0) (elems p)
+(.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
+(a, b) .+ (c, d) = (a+c, b+d)
+
+
+move :: (Int, Int) -> Direction -> State -> Maybe State
+move pos dir state = do
+          let viaLine = pos .+ dir
+          let toDot = pos .+ dir .+ dir
+          unless (inRange (bounds state) toDot) Nothing
+          unless ((state ! toDot) == Dot False) Nothing
+          state'  <- decrement (viaLine .+ turnLeft dir) state
+          state'' <- decrement (viaLine .+ turnRight dir) state'
+          return (state'' // [(toDot, Dot True), (viaLine, Line True)])
+
+onlyZeros :: State -> Bool
+onlyZeros state = all ok (elems state)
+  where ok (Box (Exactly 0)) = True
+        ok (Box (Exactly _)) = False
+        ok _                 = True
 
 solve :: Problem -> Maybe State
-solve problem = do
-  solution <- foldl startingPos Nothing (indices problem)
-  return (State { constraints = problem
-                , dots = dots solution
-                , position = position solution
-                , goal = goal solution
-                , solutionLines = solutionLines solution
-                })
-  where startingPos solution pos = case solution of
-                                     Just x -> Just x
-                                     Nothing -> solve' $ stateFromProblem problem pos
-
-        solve' state = foldl f Nothing directions
+solve problem = solve' (0,0) (0,0) (stateFromProblem problem)
+  where solve' goal pos state = foldl f Nothing directions
            where f solution dir = case solution of
                     Just x -> Just x
                     Nothing -> do
-                      state' <- moveDirection dir state
-                      if goal state' == position state'
-                        then if onlyZeros (constraints state')
+                      state' <- move pos dir state
+                      if pos == goal
+                        then if onlyZeros state'
                                then return state'
                                else Nothing
-                        else solve' state'
+                        else solve' goal (pos .+ dir) state'
 
 main :: IO ()
 main = do

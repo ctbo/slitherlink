@@ -93,11 +93,11 @@ directions = [ (0, 1)
              , (0,-1)
              , (-1,0)
              ]
-turnLeft :: (Int, Int) -> (Int, Int)
-turnLeft (x, y) = (-y, x)
-
 turnRight :: (Int, Int) -> (Int, Int)
-turnRight (x, y) = (y, -x)
+turnRight (r, c) = (-c, r)
+
+turnLeft :: (Int, Int) -> (Int, Int)
+turnLeft (r, c) = (c, -r)
 
 (.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
 (a, b) .+ (c, d) = (a+c, b+d)

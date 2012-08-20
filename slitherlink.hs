@@ -1,8 +1,7 @@
 import Data.Array.IArray
 
 import Control.Monad
-import Control.Monad.Instances
-import Data.List (transpose)
+import Control.Monad.Instances()
 
 import System.Environment
 
@@ -44,7 +43,9 @@ readProblem s = do
             return $ listArray ((0, 0), (rows-1, columns-1)) $ concat pl 
 
 sampleProblem :: Problem
-sampleProblem = case readProblem sampleProblemString of Right x -> x
+sampleProblem = case readProblem sampleProblemString of 
+  Right x -> x
+  Left _ -> undefined
 
 data CellState = Dot Bool
                | Line Bool
@@ -67,12 +68,11 @@ showMaybeState Nothing = "No solution.\n"
 showMaybeState (Just state) = showState state
 
 stateFromProblem :: Problem -> State
-stateFromProblem p = array ((0, 0), (rows, columns)) $ dots ++ lines ++ constraints
+stateFromProblem p = array ((0, 0), (rows, columns)) $ dots ++ hlines ++ vlines ++ constraints
   where ((0, 0), (rn, cn)) = bounds p
         rows    = 2*rn + 2
         columns = 2*cn + 2
         dots = [((r, c), Dot False) | r <- [0, 2 .. 2*rn+2], c <- [0, 2 .. 2*cn+2]]
-        lines = hlines ++ vlines
         hlines = [((r, c), Line False) | r <- [0, 2 .. 2*rn+2], c <- [1, 3 .. 2*cn+1]]
         vlines = [((r, c), Line False) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
         constraints = [((2*r+1, 2*c+1), Box (p!(r, c))) | r <- [0 .. rn], c <- [0 .. cn]]
@@ -84,7 +84,7 @@ decrement i state =
      Box Unconstrained -> Just state
      Box (Exactly 0)     -> Nothing
      Box (Exactly n)     -> Just (state // [(i, Box (Exactly (n-1)))])
-     otherwise           -> Nothing
+     _                   -> Nothing
 
 type Direction = (Int, Int)
 directions :: [Direction]

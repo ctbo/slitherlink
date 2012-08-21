@@ -76,11 +76,8 @@ matchingCellTypes a b = case a of
           isBox (Box _)   = True
           isBox _         = False
 
-match :: (Int, Int) -> CellState -> State -> Maybe State
-match i x state =
-      if inRange (bounds state) i && state!i == x
-        then Just state 
-        else Nothing
+match :: (Int, Int) -> CellState -> State -> Bool
+match i x state = inRange (bounds state) i && state!i == x
       
 set :: (Int, Int) -> CellState -> State -> Maybe State
 set i x state =

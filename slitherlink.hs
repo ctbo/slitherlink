@@ -64,8 +64,8 @@ stateFromProblem p = array ((0, 0), (rows, columns)) $ dots ++ hlines ++ vlines 
         vlines = [((r, c), Line False) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
         constraints = [((2*r+1, 2*c+1), Box (p!(r, c))) | r <- [0 .. rn], c <- [0 .. cn]]
 
-matchCellTypes :: CellState -> CellState -> Bool
-matchCellTypes a b = case a of
+matchingCellTypes :: CellState -> CellState -> Bool
+matchingCellTypes a b = case a of
                Dot _  -> isDot b
                Line _ -> isLine b
                Box _  -> isBox b
@@ -84,7 +84,7 @@ match i x state =
       
 set :: (Int, Int) -> CellState -> State -> Maybe State
 set i x state =
-    if inRange (bounds state) i && matchCellTypes (state!i) x
+    if inRange (bounds state) i && matchingCellTypes (state!i) x
        then Just (state // [(i, x)])
        else Nothing
 

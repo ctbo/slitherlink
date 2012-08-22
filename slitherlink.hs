@@ -64,24 +64,18 @@ stateFromProblem p = array ((0, 0), (rows, columns)) $ dots ++ hlines ++ vlines 
         vlines = [((r, c), Line False) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
         constraints = [((2*r+1, 2*c+1), Box (p!(r, c))) | r <- [0 .. rn], c <- [0 .. cn]]
 
-matchingCellTypes :: CellState -> CellState -> Bool
-matchingCellTypes a b = case a of
-               Dot _  -> isDot b
-               Line _ -> isLine b
-               Box _  -> isBox b
-    where isDot (Dot _)   = True
-          isDot _         = False
-          isLine (Line _) = True
-          isLine _        = False
-          isBox (Box _)   = True
-          isBox _         = False
+isSameType :: CellState -> CellState -> Bool
+isSameType (Dot  _) (Dot  _) = True
+isSameType (Line _) (Line _) = True
+isSameType (Box  _) (Box  _) = True
+isSameType _ _ = False
 
 match :: (Int, Int) -> CellState -> State -> Bool
 match i x state = inRange (bounds state) i && state!i == x
       
 set :: (Int, Int) -> CellState -> State -> Maybe State
 set i x state =
-    if inRange (bounds state) i && matchingCellTypes (state!i) x
+    if inRange (bounds state) i && isSameType (state!i) x
        then Just (state // [(i, x)])
        else Nothing
 

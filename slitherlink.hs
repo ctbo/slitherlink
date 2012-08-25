@@ -34,9 +34,33 @@ readProblem s = do
             let rows = length pl
             return $ listArray ((0, 0), (rows-1, columns-1)) $ concat pl 
 
+data FourLines = FourLines { top :: Bool
+                           , right :: Bool
+                           , bottom :: Bool
+                           , left :: Bool
+                           } deriving (Eq, Show)
+
+type Possibilities = [FourLines]
+
+allPossibilities :: Possibilities
+allPossibilities = [FourLines a b c d | a <- [False, True]
+                                      , b <- [False, True]
+                                      , c <- [False, True]
+                                      , d <- [False, True]
+                                      ]
+
+countLines :: FourLines -> Int
+countLines x = count top + count right + count bottom + count left
+           where count f = if f x then 1 else 0
+
+possibilitiesForConstraint :: Constraint -> Possibilities
+possibilitiesForConstraint Unconstrained = allPossibilities
+possibilitiesForConstraint (Exactly n) = filter ((==n) . countLines) allPossibilities
+
+
 data CellState = Dot Bool
                | Line Bool
-               | Box Constraint deriving (Eq, Show)
+               | Box Constraint Possibilities deriving (Eq, Show)
 type State =  Array (Int, Int) CellState
 
 showState :: State -> String
@@ -48,7 +72,7 @@ showState state = unlines $ map oneLine [r0 .. rn]
         showCell vertical s = case s of
           Dot x  -> if x then "+" else " "
           Line x -> if x then (if vertical then "|" else "-") else " "
-          Box x  -> show x
+          Box x _ -> show x
 
 showMaybeState :: Maybe State -> String
 showMaybeState Nothing = "No solution.\n"
@@ -62,31 +86,29 @@ stateFromProblem p = array ((0, 0), (rows, columns)) $ dots ++ hlines ++ vlines 
         dots = [((r, c), Dot False) | r <- [0, 2 .. 2*rn+2], c <- [0, 2 .. 2*cn+2]]
         hlines = [((r, c), Line False) | r <- [0, 2 .. 2*rn+2], c <- [1, 3 .. 2*cn+1]]
         vlines = [((r, c), Line False) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
-        constraints = [((2*r+1, 2*c+1), Box (p!(r, c))) | r <- [0 .. rn], c <- [0 .. cn]]
+        constraints = [((2*r+1, 2*c+1), Box x (possibilitiesForConstraint x))| r <- [0 .. rn], c <- [0 .. cn], let x=p!(r, c)]
 
-isSameType :: CellState -> CellState -> Bool
-isSameType (Dot  _) (Dot  _) = True
-isSameType (Line _) (Line _) = True
-isSameType (Box  _) (Box  _) = True
-isSameType _ _ = False
 
 match :: (Int, Int) -> CellState -> State -> Bool
 match i x state = inRange (bounds state) i && state!i == x
       
-set :: (Int, Int) -> CellState -> State -> Maybe State
-set i x state =
-    if inRange (bounds state) i && isSameType (state!i) x
-       then Just (state // [(i, x)])
-       else Nothing
-
 decrement :: (Int, Int) -> State -> Maybe State
 decrement i state = 
   if not (inRange (bounds state) i) then Just state else
   case state ! i of
-     Box Unconstrained -> Just state
-     Box (Exactly 0)     -> Nothing
-     Box (Exactly n)     -> Just (state // [(i, Box (Exactly (n-1)))])
+     Box Unconstrained _ -> Just state
+     Box (Exactly 0) x   -> Nothing
+     Box (Exactly n) x   -> Just (state // [(i, Box (Exactly (n-1)) x)])
      _                   -> Nothing
+
+fixLine :: (Int, Int) -> (FourLines -> Bool) -> State -> Maybe State
+fixLine i f state =
+  if not (inRange (bounds state) i) 
+     then Just state 
+     else case state ! i of
+       Box x p -> if null p' then Nothing else Just (state // [(i, Box x p')])
+                  where p' = filter f p
+       _ -> error "this can't happen"
 
 type Direction = (Int, Int)
 directions :: [Direction]
@@ -117,8 +139,8 @@ move pos dir state = do
 
 onlyZeros :: State -> Bool
 onlyZeros state = all ok (elems state)
-  where ok (Box (Exactly 0)) = True
-        ok (Box (Exactly _)) = False
+  where ok (Box (Exactly 0) _) = True
+        ok (Box (Exactly _) _) = False
         ok _                 = True
 
 solve :: Problem -> Maybe State

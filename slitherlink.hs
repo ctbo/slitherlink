@@ -168,14 +168,44 @@ move pos dir state = do
             Line [False, True] -> Just (state // [(viaLine,Line [True])]) >>= narrow toDot
             _ -> Nothing
 
+zeroOffTrailLines :: [(Int, Int)] -> State -> Maybe State
+zeroOffTrailLines trail state = foldrM zero state (indices state)
+    where zero i state = if i `elem` onTrail
+                            then Just state
+                            else case state!i of
+                              Line _ -> Just (state // [(i, Line [False])]) >>= narrow i
+                              _      -> Just state
+          onTrail = zipWith middle trail (tail trail ++ [head trail])
+          middle (a, b) (c, d) = ((a+c) `div` 2, (b+d) `div` 2)
+
+solve :: Problem -> Maybe State
+solve problem = do
+  state <- narrowAll $ stateFromProblem problem
+  solve' (20,2) (20,2) [] state
+  where solve' goal pos trail state = foldl f Nothing directions
+           where f solution dir = case solution of
+                    Just x -> Just x
+                    Nothing -> do
+                      let newPos = pos .+ dir .+ dir
+                      when (newPos `elem` trail) Nothing
+                      newState <- move pos dir state
+                      let newTrail = newPos:trail
+                      if newPos == goal
+                        then zeroOffTrailLines newTrail newState
+                        else solve' goal newPos newTrail newState
+
 
 sampleProblemString :: String
+sampleProblemString = ".3.112.2..\n.3..3.1312\n22.1......\n.3..3..2.2\n2.....2.21\n31.3.....3\n2.2..3..2.\n......1.32\n2220.3..3.\n..3.122.2.\n"
+
+{-
 sampleProblemString = unlines [".22.."
                               ,"..13."
                               ,"313.2"
                               ,"....."
                               ,".2.23"
                               ]
+-}
 
 sampleProblem :: Problem
 sampleProblem = case readProblem sampleProblemString of 

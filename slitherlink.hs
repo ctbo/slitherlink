@@ -40,29 +40,89 @@ data FourLines = FourLines { top :: Bool
                            , left :: Bool
                            } deriving (Eq, Show)
 
-type Possibilities = [FourLines]
-
-allPossibilities :: Possibilities
-allPossibilities = [FourLines a b c d | a <- [False, True]
+allPossibilities :: [FourLines]
+allPossibilities = [FourLines t r b l | t <- [False, True]
+                                      , r <- [False, True]
                                       , b <- [False, True]
-                                      , c <- [False, True]
-                                      , d <- [False, True]
+                                      , l <- [False, True]
                                       ]
 
 countLines :: FourLines -> Int
 countLines x = count top + count right + count bottom + count left
            where count f = if f x then 1 else 0
 
-possibilitiesForConstraint :: Constraint -> Possibilities
+possibilitiesForConstraint :: Constraint -> [FourLines]
 possibilitiesForConstraint Unconstrained = allPossibilities
 possibilitiesForConstraint (Exactly n) = filter ((==n) . countLines) allPossibilities
 
+dotPossibilities = filter (zeroOrTwo.countLines) allPossibilities
+    where zeroOrTwo 0 = True
+          zeroOrTwo 2 = True
+          zeroOrTwo _ = False
 
-data CellState = Dot Bool
-               | Line Bool
-               | Box Constraint Possibilities deriving (Eq, Show)
+data CellState = Line [Bool]
+               | Space [FourLines] deriving (Eq, Show)
 type State =  Array (Int, Int) CellState
 
+
+stateFromProblem :: Problem -> State
+stateFromProblem p = array ((0, 0), (rows, columns)) constraints
+  where ((0, 0), (rn, cn)) = bounds p
+        rows    = 2*rn + 2
+        columns = 2*cn + 2
+        constraints = [((r, c), Space dotPossibilities) | r <- [2, 4 .. 2*rn], c <- [2, 4 .. 2*cn]]
+         ++ [((r, 0), Space (filter (not.left) dotPossibilities) )| r <- [2, 4 .. 2*rn]]
+         ++ [((r, 2*cn+2), Space (filter (not.right) dotPossibilities)) | r <- [2, 4 .. 2*rn]]
+         ++ [((0, c), Space (filter (not.top) dotPossibilities)) | c <- [2, 4 .. 2*cn]]
+         ++ [((2*rn+2, c), Space (filter (not.bottom) dotPossibilities)) | c <- [2, 4 .. 2*cn]]
+         ++ [((0, 0), Space (filter (not.top) $ filter (not.left) dotPossibilities))
+            ,((0, 2*cn+2), Space (filter (not.top) $ filter (not.right) dotPossibilities))
+            ,((2*rn+2, 0), Space (filter (not.bottom) $ filter (not.left) dotPossibilities))
+            ,((2*rn+2, 2*cn+2), Space (filter (not.bottom) $ filter (not.right) dotPossibilities))]
+         ++ [((r, c), Line [False, True]) | r <- [0, 2 .. 2*rn+2], c <- [1, 3 .. 2*cn+1]]
+         ++ [((r, c), Line [False, True]) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
+         ++ [((2*r+1, 2*c+1), Space (possibilitiesForConstraint (p!(r, c))))| r <- [0 .. rn], c <- [0 .. cn]]
+
+narrow :: (Int, Int) -> State -> Maybe State
+narrow i@(r,c) state = if not (inRange (bounds state) i) then Just state else
+    case state!i of
+      Line ls -> do
+        let ls' = filter (match (r-1,c) state bottom)
+                $ filter (match (r, c+1) state left)
+                $ filter (match (r+1, c) state top)
+                $ filter (match (r, c-1) state right) ls
+        if null ls' 
+          then Nothing 
+          else if ls' == ls 
+            then Just state 
+            else Just (state // [(i, Line ls')]) >>= narrow (r-1, c)
+                                                 >>= narrow (r, c+1)
+                                                 >>= narrow (r+1, c)
+                                                 >>= narrow (r, c-1)
+
+
+match :: (Int, Int) -> State -> (FourLines -> Bool) -> Bool -> Bool
+match i state f x = (not (inRange (bounds state) i)) 
+                || check (state!i)
+    where check (Space xs) = any ((==x).f) xs
+
+
+sampleProblemString :: String
+sampleProblemString = unlines [".22.."
+                              ,"..13."
+                              ,"313.2"
+                              ,"....."
+                              ,".2.23"
+                              ]
+
+sampleProblem :: Problem
+sampleProblem = case readProblem sampleProblemString of 
+  Right x -> x
+  Left _ -> undefined -- can't happen
+
+
+
+{-
 showState :: State -> String
 showState state = unlines $ map oneLine [r0 .. rn]
   where ((r0, c0), (rn, cn)) = bounds state
@@ -77,17 +137,6 @@ showState state = unlines $ map oneLine [r0 .. rn]
 showMaybeState :: Maybe State -> String
 showMaybeState Nothing = "No solution.\n"
 showMaybeState (Just state) = showState state
-
-stateFromProblem :: Problem -> State
-stateFromProblem p = array ((0, 0), (rows, columns)) $ dots ++ hlines ++ vlines ++ constraints
-  where ((0, 0), (rn, cn)) = bounds p
-        rows    = 2*rn + 2
-        columns = 2*cn + 2
-        dots = [((r, c), Dot False) | r <- [0, 2 .. 2*rn+2], c <- [0, 2 .. 2*cn+2]]
-        hlines = [((r, c), Line False) | r <- [0, 2 .. 2*rn+2], c <- [1, 3 .. 2*cn+1]]
-        vlines = [((r, c), Line False) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
-        constraints = [((2*r+1, 2*c+1), Box x (possibilitiesForConstraint x))| r <- [0 .. rn], c <- [0 .. cn], let x=p!(r, c)]
-
 
 match :: (Int, Int) -> CellState -> State -> Bool
 match i x state = inRange (bounds state) i && state!i == x
@@ -165,19 +214,4 @@ main = do
        Left e -> putStrLn e
        Right p -> putStrLn $ showMaybeState $ solve p
 
-
-
-
-sampleProblemString :: String
-sampleProblemString = unlines [".22.."
-                              ,"..13."
-                              ,"313.2"
-                              ,"....."
-                              ,".2.23"
-                              ]
-
-sampleProblem :: Problem
-sampleProblem = case readProblem sampleProblemString of 
-  Right x -> x
-  Left _ -> undefined -- can't happen
-
+-}

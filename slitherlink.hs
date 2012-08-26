@@ -56,6 +56,7 @@ possibilitiesForConstraint :: Constraint -> [FourLines]
 possibilitiesForConstraint Unconstrained = allPossibilities
 possibilitiesForConstraint (Exactly n) = filter ((==n) . countLines) allPossibilities
 
+dotPossibilities :: [FourLines]
 dotPossibilities = filter (zeroOrTwo.countLines) allPossibilities
     where zeroOrTwo 0 = True
           zeroOrTwo 2 = True
@@ -127,16 +128,19 @@ match :: (Int, Int) -> State -> (FourLines -> Bool) -> Bool -> Bool
 match i state f x = (not (inRange (bounds state) i)) 
                 || check (state!i)
     where check (Space xs) = any ((==x).f) xs
+          check _ = undefined -- can't happen
 
 matchl :: (Int, Int) -> State -> Bool -> Bool
 matchl i state x = (not (inRange (bounds state) i)) 
                 || check (state!i)
     where check (Line ls) = x `elem` ls
+          check _ = undefined -- can't happen
 
 match2 :: (Int, Int) -> State -> (FourLines -> Bool) -> Bool -> (FourLines -> Bool) -> Bool -> Bool
 match2 i state f1 x1 f2 x2 = (not (inRange (bounds state) i)) 
                 || check (state!i)
     where check (Space xs) = any (\x -> f1 x == x1 && f2 x == x2) xs
+          check _ = undefined -- can't happen
 
 narrowAll :: State -> Maybe State
 narrowAll state = foldrM narrow state (indices state)
@@ -148,11 +152,6 @@ directions = [ (0, 1)
              , (0,-1)
              , (-1,0)
              ]
-turnRight :: (Int, Int) -> (Int, Int)
-turnRight (r, c) = (-c, r)
-
-turnLeft :: (Int, Int) -> (Int, Int)
-turnLeft (r, c) = (c, -r)
 
 (.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
 (a, b) .+ (c, d) = (a+c, b+d)
@@ -170,11 +169,11 @@ move pos dir state = do
 
 zeroOffTrailLines :: [(Int, Int)] -> State -> Maybe State
 zeroOffTrailLines trail state = foldrM zero state (indices state)
-    where zero i state = if i `elem` onTrail
-                            then Just state
-                            else case state!i of
-                              Line _ -> Just (state // [(i, Line [False])]) >>= narrow i
-                              _      -> Just state
+    where zero i s = if i `elem` onTrail
+                            then Just s
+                            else case s!i of
+                              Line _ -> Just (s // [(i, Line [False])]) >>= narrow i
+                              _      -> Just s
           onTrail = zipWith middle trail (tail trail ++ [head trail])
           middle (a, b) (c, d) = ((a+c) `div` 2, (b+d) `div` 2)
 
@@ -222,6 +221,7 @@ showState state = unlines $ map oneLine [r0 .. rn]
           Line [False] -> "x"
           Line [True] -> if vertical then "|" else "-"
           Space fs -> ["0123456789ABCDEFGH" !! (length fs)]
+          _ -> "?" -- can't happen
 
 showMaybeState :: Maybe State -> String
 showMaybeState Nothing = "No solution.\n"

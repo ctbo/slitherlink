@@ -203,29 +203,30 @@ solve'' goal pos trail state = foldl f Nothing directions
 
 startingPositions :: State -> [(Int, Int)]
 startingPositions state = if null s then evenIndices else [head s]
-    where s = filter hasLine evenIndices
+    where s = filter (hasLine.(state!)) evenIndices
           ((0, 0), (rn, cn)) = bounds state
           evenIndices = [(r, c) | r <- [0, 2 .. rn], c <- [0, 2 .. cn]]
-          hasLine i = let Space ls = state!i in not (FourLines False False False False `elem` ls)
         
+hasLine :: CellState -> Bool
+hasLine (Space ls) = not (FourLines False False False False `elem` ls)
+hasLine _          = undefined -- can't happen
 
-
-showState :: State -> String
-showState state = unlines $ map oneLine [r0 .. rn]
+showSolution :: Problem -> Maybe State -> String
+showSolution problem (Just state) = unlines $ map oneLine [r0 .. rn]
   where ((r0, c0), (rn, cn)) = bounds state
         oneLine r = concat $ map (oneCell r) [c0 .. cn]
-        oneCell r c = showCell (isVertical r) $ state ! (r, c)
+        oneCell r c 
+          | even r && even c = showDot $ state ! (r, c)
+          | odd r && odd c = showConstraint (((r-1) `div` 2), ((c-1) `div` 2))
+          | otherwise = showLine (isVertical r) $ state ! (r, c)
         isVertical = odd
-        showCell vertical s = case s of
-          Line [False, True] -> " "
-          Line [False] -> "x"
+        showLine vertical s = case s of
           Line [True] -> if vertical then "|" else "-"
-          Space fs -> ["0123456789ABCDEFGH" !! (length fs)]
-          _ -> "?" -- can't happen
-
-showMaybeState :: Maybe State -> String
-showMaybeState Nothing = "No solution.\n"
-showMaybeState (Just state) = showState state
+          Line _      -> " "
+          _           -> undefined -- can't happen
+        showDot s = if hasLine s then "+" else " "
+        showConstraint i = show $ problem!i
+showSolution _ _ = "No solution.\n"
 
 main :: IO ()
 main = do
@@ -233,7 +234,7 @@ main = do
      pString <- readFile filename
      case readProblem pString of
        Left e -> putStrLn e
-       Right p -> putStrLn $ showMaybeState $ solve p
+       Right p -> putStrLn $ showSolution p $ solve p
 
 
 -- stuff for interactive experiments
@@ -254,5 +255,22 @@ sampleProblem :: Problem
 sampleProblem = case readProblem sampleProblemString of 
   Right x -> x
   Left _ -> undefined -- can't happen
+
+showState :: State -> String
+showState state = unlines $ map oneLine [r0 .. rn]
+  where ((r0, c0), (rn, cn)) = bounds state
+        oneLine r = concat $ map (oneCell r) [c0 .. cn]
+        oneCell r c = showCell (isVertical r) $ state ! (r, c)
+        isVertical = odd
+        showCell vertical s = case s of
+          Line [False, True] -> " "
+          Line [False] -> "x"
+          Line [True] -> if vertical then "|" else "-"
+          Space fs -> ["0123456789ABCDEFGH" !! (length fs)]
+          _ -> undefined -- can't happen
+
+showMaybeState :: Maybe State -> String
+showMaybeState Nothing = "No solution.\n"
+showMaybeState (Just state) = showState state
 
 

@@ -240,16 +240,17 @@ main = do
 -- stuff for interactive experiments
 
 sampleProblemString :: String
-sampleProblemString = ".3.112.2..\n.3..3.1312\n22.1......\n.3..3..2.2\n2.....2.21\n31.3.....3\n2.2..3..2.\n......1.32\n2220.3..3.\n..3.122.2.\n"
-
-{-
-sampleProblemString = unlines [".22.."
-                              ,"..13."
-                              ,"313.2"
-                              ,"....."
-                              ,".2.23"
+sampleProblemString = unlines [".3.112.2.."
+                              ,".3..3.1312"
+                              ,"22.1......"
+                              ,".3..3..2.2"
+                              ,"2.....2.21"
+                              ,"31.3.....3"
+                              ,"2.2..3..2."
+                              ,"......1.32"
+                              ,"2220.3..3."
+                              ,"..3.122.2."
                               ]
--}
 
 sampleProblem :: Problem
 sampleProblem = case readProblem sampleProblemString of 

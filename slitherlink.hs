@@ -152,7 +152,6 @@ sampleProblem = case readProblem sampleProblemString of
 
 
 
-{-
 showState :: State -> String
 showState state = unlines $ map oneLine [r0 .. rn]
   where ((r0, c0), (rn, cn)) = bounds state
@@ -160,14 +159,16 @@ showState state = unlines $ map oneLine [r0 .. rn]
         oneCell r c = showCell (isVertical r) $ state ! (r, c)
         isVertical = odd
         showCell vertical s = case s of
-          Dot x  -> if x then "+" else " "
-          Line x -> if x then (if vertical then "|" else "-") else " "
-          Box x _ -> show x
+          Line [False, True] -> " "
+          Line [False] -> "x"
+          Line [True] -> if vertical then "|" else "-"
+          Space fs -> if length fs > 9 then "*" else show $ length fs
 
 showMaybeState :: Maybe State -> String
 showMaybeState Nothing = "No solution.\n"
 showMaybeState (Just state) = showState state
 
+{-
 match :: (Int, Int) -> CellState -> State -> Bool
 match i x state = inRange (bounds state) i && state!i == x
       

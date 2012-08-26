@@ -99,11 +99,38 @@ narrow i@(r,c) state = if not (inRange (bounds state) i) then Just state else
                                                  >>= narrow (r, c+1)
                                                  >>= narrow (r+1, c)
                                                  >>= narrow (r, c-1)
+      Space ss -> do
+        let ss' = filter ((matchl (r-1, c) state).top)
+                $ filter ((matchl (r, c+1) state).right)
+                $ filter ((matchl (r+1, c) state).bottom)
+                $ filter ((matchl (r, c-1) state).left) 
+                $ filter (\x -> match2 (r-1, c-1) state right (top x) bottom (left x))
+                $ filter (\x -> match2 (r-1, c+1) state left (top x ) bottom (right x))
+                $ filter (\x -> match2 (r+1, c-1) state top (left x) right (bottom x))
+                $ filter (\x -> match2 (r+1, c+1) state top (right x) left (bottom x)) 
+                ss
+        if null ss'
+          then Nothing
+          else if ss' == ss
+            then Just state
+            else Just (state // [(i, Space ss')]) >>= narrow (r-1, c)
+                                                  >>= narrow (r, c+1)
+                                                  >>= narrow (r+1, c)
+                                                  >>= narrow (r, c-1)
+                                                  >>= narrow (r-1, c-1)
+                                                  >>= narrow (r-1, c+1)
+                                                  >>= narrow (r+1, c-1)
+                                                  >>= narrow (r+1, c+1)
 
 match :: (Int, Int) -> State -> (FourLines -> Bool) -> Bool -> Bool
 match i state f x = (not (inRange (bounds state) i)) 
                 || check (state!i)
     where check (Space xs) = any ((==x).f) xs
+
+matchl :: (Int, Int) -> State -> Bool -> Bool
+matchl i state x = (not (inRange (bounds state) i)) 
+                || check (state!i)
+    where check (Line ls) = x `elem` ls
 
 match2 :: (Int, Int) -> State -> (FourLines -> Bool) -> Bool -> (FourLines -> Bool) -> Bool -> Bool
 match2 i state f1 x1 f2 x2 = (not (inRange (bounds state) i)) 

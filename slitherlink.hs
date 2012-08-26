@@ -2,6 +2,7 @@ import Data.Array.IArray
 
 import Control.Monad
 import Control.Monad.Instances()
+import Data.Foldable (foldrM)
 
 import System.Environment
 
@@ -137,6 +138,10 @@ match2 i state f1 x1 f2 x2 = (not (inRange (bounds state) i))
                 || check (state!i)
     where check (Space xs) = any (\x -> f1 x == x1 && f2 x == x2) xs
 
+narrowAll :: State -> Maybe State
+narrowAll state = foldrM narrow state (indices state)
+
+
 sampleProblemString :: String
 sampleProblemString = unlines [".22.."
                               ,"..13."
@@ -162,7 +167,7 @@ showState state = unlines $ map oneLine [r0 .. rn]
           Line [False, True] -> " "
           Line [False] -> "x"
           Line [True] -> if vertical then "|" else "-"
-          Space fs -> if length fs > 9 then "*" else show $ length fs
+          Space fs -> ["0123456789ABCDEFGH" !! (length fs)]
 
 showMaybeState :: Maybe State -> String
 showMaybeState Nothing = "No solution.\n"

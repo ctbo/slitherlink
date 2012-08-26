@@ -87,7 +87,7 @@ narrow :: (Int, Int) -> State -> Maybe State
 narrow i@(r,c) state = if not (inRange (bounds state) i) then Just state else
     case state!i of
       Line ls -> do
-        let ls' = filter (match (r-1,c) state bottom)
+        let ls' = filter (match (r-1, c) state bottom)
                 $ filter (match (r, c+1) state left)
                 $ filter (match (r+1, c) state top)
                 $ filter (match (r, c-1) state right) ls
@@ -100,12 +100,15 @@ narrow i@(r,c) state = if not (inRange (bounds state) i) then Just state else
                                                  >>= narrow (r+1, c)
                                                  >>= narrow (r, c-1)
 
-
 match :: (Int, Int) -> State -> (FourLines -> Bool) -> Bool -> Bool
 match i state f x = (not (inRange (bounds state) i)) 
                 || check (state!i)
     where check (Space xs) = any ((==x).f) xs
 
+match2 :: (Int, Int) -> State -> (FourLines -> Bool) -> Bool -> (FourLines -> Bool) -> Bool -> Bool
+match2 i state f1 x1 f2 x2 = (not (inRange (bounds state) i)) 
+                || check (state!i)
+    where check (Space xs) = any (\x -> f1 x == x1 && f2 x == x2) xs
 
 sampleProblemString :: String
 sampleProblemString = unlines [".22.."

@@ -104,8 +104,8 @@ narrow i@(r,c) state = if not (inRange (bounds state) i) then Just state else
                 $ filter ((matchl (r, c+1) state).right)
                 $ filter ((matchl (r+1, c) state).bottom)
                 $ filter ((matchl (r, c-1) state).left) 
-                $ filter (\x -> match2 (r-1, c-1) state right (top x) bottom (left x))
-                $ filter (\x -> match2 (r-1, c+1) state left (top x ) bottom (right x))
+                $ filter (\x -> match2 (r-1, c-1) state bottom (left x) right (top x))
+                $ filter (\x -> match2 (r-1, c+1) state bottom (right x) left (top x ))
                 $ filter (\x -> match2 (r+1, c-1) state top (left x) right (bottom x))
                 $ filter (\x -> match2 (r+1, c+1) state top (right x) left (bottom x)) 
                 ss

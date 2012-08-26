@@ -1,0 +1,10 @@
+slitherlink.hs -- (c) 2012 by Harald Bögeholz
+
+This is a solver for Slitherlink puzzles written in Haskell.
+
+I am a Haskell newbie and this is my first attempt at a serious
+program in Haskell, so I appreciate any suggestions for improvement.
+
+
+Harald Bögeholz
+bo@ct.de

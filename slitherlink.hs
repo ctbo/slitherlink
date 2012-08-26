@@ -141,6 +141,33 @@ match2 i state f1 x1 f2 x2 = (not (inRange (bounds state) i))
 narrowAll :: State -> Maybe State
 narrowAll state = foldrM narrow state (indices state)
 
+type Direction = (Int, Int)
+directions :: [Direction]
+directions = [ (0, 1)
+             , (1, 0)
+             , (0,-1)
+             , (-1,0)
+             ]
+turnRight :: (Int, Int) -> (Int, Int)
+turnRight (r, c) = (-c, r)
+
+turnLeft :: (Int, Int) -> (Int, Int)
+turnLeft (r, c) = (c, -r)
+
+(.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
+(a, b) .+ (c, d) = (a+c, b+d)
+
+
+move :: (Int, Int) -> Direction -> State -> Maybe State
+move pos dir state = do
+          let viaLine = pos .+ dir
+          let toDot = pos .+ dir .+ dir
+          unless (inRange (bounds state) toDot) Nothing
+          case state!viaLine of
+            Line [True] -> Just state
+            Line [False, True] -> Just (state // [(viaLine,Line [True])]) >>= narrow toDot
+            _ -> Nothing
+
 
 sampleProblemString :: String
 sampleProblemString = unlines [".22.."

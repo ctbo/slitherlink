@@ -181,10 +181,17 @@ zeroOffTrailLines trail state = foldrM zero state (indices state)
 solve :: Problem -> Maybe State
 solve problem = do
   state <- narrowAll $ stateFromProblem problem
-  let start = startingPosition state
-  solve' start start [] state
-  where solve' goal pos trail state = foldl f Nothing directions
-           where f solution dir = case solution of
+  solve' (startingPositions state) state
+
+solve' :: [(Int, Int)] -> State -> Maybe State
+solve' is state = foldl f Nothing is
+    where f solution start = case solution of
+                               Just x -> Just x
+                               Nothing -> solve'' start start [] state
+
+solve'' :: (Int, Int) -> (Int, Int) -> [(Int, Int)] -> State -> Maybe State
+solve'' goal pos trail state = foldl f Nothing directions
+            where f solution dir = case solution of
                     Just x -> Just x
                     Nothing -> do
                       let newPos = pos .+ dir .+ dir
@@ -193,14 +200,43 @@ solve problem = do
                       let newTrail = newPos:trail
                       if newPos == goal
                         then zeroOffTrailLines newTrail newState
-                        else solve' goal newPos newTrail newState
+                        else solve'' goal newPos newTrail newState
 
-startingPosition :: State -> (Int, Int)
-startingPosition state = head $ filter hasLine evenIndices
-    where ((0, 0), (rn, cn)) = bounds state
+startingPositions :: State -> [(Int, Int)]
+startingPositions state = if null s then evenIndices else [head s]
+    where s = filter hasLine evenIndices
+          ((0, 0), (rn, cn)) = bounds state
           evenIndices = [(r, c) | r <- [0, 2 .. rn], c <- [0, 2 .. cn]]
           hasLine i = let Space ls = state!i in not (FourLines False False False False `elem` ls)
         
+
+
+showState :: State -> String
+showState state = unlines $ map oneLine [r0 .. rn]
+  where ((r0, c0), (rn, cn)) = bounds state
+        oneLine r = concat $ map (oneCell r) [c0 .. cn]
+        oneCell r c = showCell (isVertical r) $ state ! (r, c)
+        isVertical = odd
+        showCell vertical s = case s of
+          Line [False, True] -> " "
+          Line [False] -> "x"
+          Line [True] -> if vertical then "|" else "-"
+          Space fs -> ["0123456789ABCDEFGH" !! (length fs)]
+
+showMaybeState :: Maybe State -> String
+showMaybeState Nothing = "No solution.\n"
+showMaybeState (Just state) = showState state
+
+main :: IO ()
+main = do
+     [filename] <- getArgs
+     pString <- readFile filename
+     case readProblem pString of
+       Left e -> putStrLn e
+       Right p -> putStrLn $ showMaybeState $ solve p
+
+
+-- stuff for interactive experiments
 
 sampleProblemString :: String
 sampleProblemString = ".3.112.2..\n.3..3.1312\n22.1......\n.3..3..2.2\n2.....2.21\n31.3.....3\n2.2..3..2.\n......1.32\n2220.3..3.\n..3.122.2.\n"
@@ -220,98 +256,3 @@ sampleProblem = case readProblem sampleProblemString of
   Left _ -> undefined -- can't happen
 
 
-
-showState :: State -> String
-showState state = unlines $ map oneLine [r0 .. rn]
-  where ((r0, c0), (rn, cn)) = bounds state
-        oneLine r = concat $ map (oneCell r) [c0 .. cn]
-        oneCell r c = showCell (isVertical r) $ state ! (r, c)
-        isVertical = odd
-        showCell vertical s = case s of
-          Line [False, True] -> " "
-          Line [False] -> "x"
-          Line [True] -> if vertical then "|" else "-"
-          Space fs -> ["0123456789ABCDEFGH" !! (length fs)]
-
-showMaybeState :: Maybe State -> String
-showMaybeState Nothing = "No solution.\n"
-showMaybeState (Just state) = showState state
-
-{-
-match :: (Int, Int) -> CellState -> State -> Bool
-match i x state = inRange (bounds state) i && state!i == x
-      
-decrement :: (Int, Int) -> State -> Maybe State
-decrement i state = 
-  if not (inRange (bounds state) i) then Just state else
-  case state ! i of
-     Box Unconstrained _ -> Just state
-     Box (Exactly 0) x   -> Nothing
-     Box (Exactly n) x   -> Just (state // [(i, Box (Exactly (n-1)) x)])
-     _                   -> Nothing
-
-fixLine :: (Int, Int) -> (FourLines -> Bool) -> State -> Maybe State
-fixLine i f state =
-  if not (inRange (bounds state) i) 
-     then Just state 
-     else case state ! i of
-       Box x p -> if null p' then Nothing else Just (state // [(i, Box x p')])
-                  where p' = filter f p
-       _ -> error "this can't happen"
-
-type Direction = (Int, Int)
-directions :: [Direction]
-directions = [ (0, 1)
-             , (1, 0)
-             , (0,-1)
-             , (-1,0)
-             ]
-turnRight :: (Int, Int) -> (Int, Int)
-turnRight (r, c) = (-c, r)
-
-turnLeft :: (Int, Int) -> (Int, Int)
-turnLeft (r, c) = (c, -r)
-
-(.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
-(a, b) .+ (c, d) = (a+c, b+d)
-
-
-move :: (Int, Int) -> Direction -> State -> Maybe State
-move pos dir state = do
-          let viaLine = pos .+ dir
-          let toDot = pos .+ dir .+ dir
-          unless (inRange (bounds state) toDot) Nothing
-          unless ((state ! toDot) == Dot False) Nothing
-          state'  <- decrement (viaLine .+ turnLeft dir) state
-          state'' <- decrement (viaLine .+ turnRight dir) state'
-          return (state'' // [(toDot, Dot True), (viaLine, Line True)])
-
-onlyZeros :: State -> Bool
-onlyZeros state = all ok (elems state)
-  where ok (Box (Exactly 0) _) = True
-        ok (Box (Exactly _) _) = False
-        ok _                 = True
-
-solve :: Problem -> Maybe State
-solve problem = solve' (0,0) (0,0) (stateFromProblem problem)
-  where solve' goal pos state = foldl f Nothing directions
-           where f solution dir = case solution of
-                    Just x -> Just x
-                    Nothing -> do
-                      state' <- move pos dir state
-                      let newPos = pos .+ dir .+ dir
-                      if newPos == goal
-                        then if onlyZeros state'
-                               then return state'
-                               else Nothing
-                        else solve' goal (newPos) state'
-
-main :: IO ()
-main = do
-     [filename] <- getArgs
-     pString <- readFile filename
-     case readProblem pString of
-       Left e -> putStrLn e
-       Right p -> putStrLn $ showMaybeState $ solve p
-
--}

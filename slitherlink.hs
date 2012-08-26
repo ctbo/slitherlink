@@ -79,13 +79,13 @@ stateFromProblem p = array ((0, 0), (rows, columns)) constraints
         rows    = 2*rn + 2
         columns = 2*cn + 2
         constraints = [((r, c), Space dotPossibilities) | r <- [2, 4 .. 2*rn], c <- [2, 4 .. 2*cn]]
-         ++ [((r, 0), Space (filter (not.left) dotPossibilities) )| r <- [2, 4 .. 2*rn]]
-         ++ [((r, 2*cn+2), Space (filter (not.right) dotPossibilities)) | r <- [2, 4 .. 2*rn]]
-         ++ [((0, c), Space (filter (not.top) dotPossibilities)) | c <- [2, 4 .. 2*cn]]
-         ++ [((2*rn+2, c), Space (filter (not.bottom) dotPossibilities)) | c <- [2, 4 .. 2*cn]]
-         ++ [((0, 0), Space (filter (not.top) $ filter (not.left) dotPossibilities))
-            ,((0, 2*cn+2), Space (filter (not.top) $ filter (not.right) dotPossibilities))
-            ,((2*rn+2, 0), Space (filter (not.bottom) $ filter (not.left) dotPossibilities))
+         ++ [((r, 0),           Space (filter (not.left) dotPossibilities) )| r <- [2, 4 .. 2*rn]]
+         ++ [((r, 2*cn+2),      Space (filter (not.right) dotPossibilities)) | r <- [2, 4 .. 2*rn]]
+         ++ [((0, c),           Space (filter (not.top) dotPossibilities)) | c <- [2, 4 .. 2*cn]]
+         ++ [((2*rn+2, c),      Space (filter (not.bottom) dotPossibilities)) | c <- [2, 4 .. 2*cn]]
+         ++ [((0, 0),           Space (filter (not.top) $ filter (not.left) dotPossibilities))
+            ,((0, 2*cn+2),      Space (filter (not.top)    $ filter (not.right) dotPossibilities))
+            ,((2*rn+2, 0),      Space (filter (not.bottom) $ filter (not.left) dotPossibilities))
             ,((2*rn+2, 2*cn+2), Space (filter (not.bottom) $ filter (not.right) dotPossibilities))]
          ++ [((r, c), Line [False, True]) | r <- [0, 2 .. 2*rn+2], c <- [1, 3 .. 2*cn+1]]
          ++ [((r, c), Line [False, True]) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]

@@ -181,7 +181,8 @@ zeroOffTrailLines trail state = foldrM zero state (indices state)
 solve :: Problem -> Maybe State
 solve problem = do
   state <- narrowAll $ stateFromProblem problem
-  solve' (20,2) (20,2) [] state
+  let start = startingPosition state
+  solve' start start [] state
   where solve' goal pos trail state = foldl f Nothing directions
            where f solution dir = case solution of
                     Just x -> Just x
@@ -194,6 +195,12 @@ solve problem = do
                         then zeroOffTrailLines newTrail newState
                         else solve' goal newPos newTrail newState
 
+startingPosition :: State -> (Int, Int)
+startingPosition state = head $ filter hasLine evenIndices
+    where ((0, 0), (rn, cn)) = bounds state
+          evenIndices = [(r, c) | r <- [0, 2 .. rn], c <- [0, 2 .. cn]]
+          hasLine i = let Space ls = state!i in not (FourLines False False False False `elem` ls)
+        
 
 sampleProblemString :: String
 sampleProblemString = ".3.112.2..\n.3..3.1312\n22.1......\n.3..3..2.2\n2.....2.21\n31.3.....3\n2.2..3..2.\n......1.32\n2220.3..3.\n..3.122.2.\n"

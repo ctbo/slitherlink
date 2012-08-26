@@ -9,6 +9,8 @@ import Data.Array.IArray
 import Control.Monad
 import Control.Monad.Instances()
 import Data.Foldable (foldrM)
+import Data.Maybe (isJust)
+import Data.List (find)
 
 import System.Environment
 
@@ -183,22 +185,20 @@ zeroOffTrailLines trail state = foldrM zero state (indices state)
           onTrail = zipWith middle trail (tail trail ++ [head trail])
           middle (a, b) (c, d) = ((a+c) `div` 2, (b+d) `div` 2)
 
+untilJust :: (b -> Maybe a) -> [b] -> Maybe a
+untilJust f = join . find isJust . map f
+
 solve :: Problem -> Maybe State
 solve problem = do
   state <- narrowAll $ stateFromProblem problem
   solve' (startingPositions state) state
 
 solve' :: [(Int, Int)] -> State -> Maybe State
-solve' is state = foldl f Nothing is
-    where f solution start = case solution of
-                               Just x -> Just x
-                               Nothing -> solve'' start start [] state
+solve' is state = untilJust (\i -> solve'' i i [] state) is
 
 solve'' :: (Int, Int) -> (Int, Int) -> [(Int, Int)] -> State -> Maybe State
-solve'' goal pos trail state = foldl f Nothing directions
-            where f solution dir = case solution of
-                    Just x -> Just x
-                    Nothing -> do
+solve'' goal pos trail state = untilJust f directions
+            where f dir = do
                       let newPos = pos .+ dir .+ dir
                       when (newPos `elem` trail) Nothing
                       newState <- move pos dir state
@@ -235,12 +235,13 @@ showSolution problem (Just state) = unlines $ map oneLine [r0 .. rn]
 showSolution _ _ = "No solution.\n"
 
 main :: IO ()
-main = do
-     [filename] <- getArgs
-     pString <- readFile filename
-     case readProblem pString of
-       Left e -> putStrLn e
-       Right p -> putStrLn $ showSolution p $ solve p
+main = getArgs >>= f >>= g where
+    f [filename] = readFile filename
+    f []         = return sampleProblemString
+    f _          = error "zu viel mann"
+    g pString = case readProblem pString of
+      Left e -> putStrLn e
+      Right p -> putStrLn $ showSolution p $ solve p
 
 
 -- stuff for interactive experiments

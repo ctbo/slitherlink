@@ -238,7 +238,7 @@ main :: IO ()
 main = getArgs >>= f >>= g where
     f [filename] = readFile filename
     f []         = return sampleProblemString
-    f _          = error "zu viel mann"
+    f _          = error "Too many arguments."
     g pString = case readProblem pString of
       Left e -> putStrLn e
       Right p -> putStrLn $ showSolution p $ solve p

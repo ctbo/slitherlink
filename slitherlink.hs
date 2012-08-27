@@ -80,15 +80,7 @@ stateFromProblem p = array ((0, 0), (rows, columns)) constraints
   where ((0, 0), (rn, cn)) = bounds p
         rows    = 2*rn + 2
         columns = 2*cn + 2
-        constraints = [((r, c), Space dotPossibilities) | r <- [2, 4 .. 2*rn], c <- [2, 4 .. 2*cn]]
-         ++ [((r, 0),           Space (filter (not.left) dotPossibilities) )| r <- [2, 4 .. 2*rn]]
-         ++ [((r, 2*cn+2),      Space (filter (not.right) dotPossibilities)) | r <- [2, 4 .. 2*rn]]
-         ++ [((0, c),           Space (filter (not.top) dotPossibilities)) | c <- [2, 4 .. 2*cn]]
-         ++ [((2*rn+2, c),      Space (filter (not.bottom) dotPossibilities)) | c <- [2, 4 .. 2*cn]]
-         ++ [((0, 0),           Space (filter (not.top) $ filter (not.left) dotPossibilities))
-            ,((0, 2*cn+2),      Space (filter (not.top)    $ filter (not.right) dotPossibilities))
-            ,((2*rn+2, 0),      Space (filter (not.bottom) $ filter (not.left) dotPossibilities))
-            ,((2*rn+2, 2*cn+2), Space (filter (not.bottom) $ filter (not.right) dotPossibilities))]
+        constraints = [((r, c), Space dotPossibilities) | r <- [0, 2 .. 2*rn+2], c <- [0, 2 .. 2*cn+2]]
          ++ [((r, c), Line [False, True]) | r <- [0, 2 .. 2*rn+2], c <- [1, 3 .. 2*cn+1]]
          ++ [((r, c), Line [False, True]) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
          ++ [((2*r+1, 2*c+1), Space (possibilitiesForConstraint (p!(r, c))))| r <- [0 .. rn], c <- [0 .. cn]]
@@ -139,8 +131,9 @@ match i state f x = (not (inRange (bounds state) i))
           check _ = undefined -- can't happen
 
 matchl :: (Int, Int) -> State -> Bool -> Bool
-matchl i state x = (not (inRange (bounds state) i)) 
-                || check (state!i)
+matchl i state x = if inRange (bounds state) i
+                      then check (state!i)
+                      else x == False -- no lines allowed outside grid
     where check (Line ls) = x `elem` ls
           check _ = undefined -- can't happen
 

@@ -3,15 +3,12 @@
 -- Copyright (C) 2012 by Harald Bögeholz
 -- See LICENSE file for license information
 
-
 import Data.Array.IArray
-
 import Control.Monad
 import Control.Monad.Instances()
 import Data.Foldable (foldrM)
 import Data.Maybe (isJust)
 import Data.List (find)
-
 import System.Environment
 
 data Constraint = Unconstrained | Exactly Int deriving (Eq)
@@ -33,6 +30,7 @@ readProblemList ::  String -> Either String ProblemList
 readProblemList = (mapM . mapM) readConstraint . lines
 
 type Problem = Array (Int, Int) Constraint
+
 readProblem :: String -> Either String Problem
 readProblem s = do
             pl <- readProblemList s
@@ -49,23 +47,23 @@ data FourLines = FourLines { top :: Bool
                            , left :: Bool
                            } deriving (Eq, Show)
 
-allPossibilities :: [FourLines]
-allPossibilities = [FourLines t r b l | t <- [False, True]
+countLines :: FourLines -> Int
+countLines x = count top + count right + count bottom + count left
+           where count f = if f x then 1 else 0
+
+flListAll :: [FourLines]
+flListAll = [FourLines t r b l | t <- [False, True]
                                       , r <- [False, True]
                                       , b <- [False, True]
                                       , l <- [False, True]
                                       ]
 
-countLines :: FourLines -> Int
-countLines x = count top + count right + count bottom + count left
-           where count f = if f x then 1 else 0
+flListForConstraint :: Constraint -> [FourLines]
+flListForConstraint Unconstrained = flListAll
+flListForConstraint (Exactly n) = filter ((==n) . countLines) flListAll
 
-possibilitiesForConstraint :: Constraint -> [FourLines]
-possibilitiesForConstraint Unconstrained = allPossibilities
-possibilitiesForConstraint (Exactly n) = filter ((==n) . countLines) allPossibilities
-
-dotPossibilities :: [FourLines]
-dotPossibilities = filter (zeroOrTwo.countLines) allPossibilities
+flListXing :: [FourLines]
+flListXing = filter (zeroOrTwo.countLines) flListAll
     where zeroOrTwo 0 = True
           zeroOrTwo 2 = True
           zeroOrTwo _ = False
@@ -74,16 +72,15 @@ data CellState = Line [Bool]
                | Space [FourLines] deriving (Eq, Show)
 type State =  Array (Int, Int) CellState
 
-
 stateFromProblem :: Problem -> State
-stateFromProblem p = array ((0, 0), (rows, columns)) constraints
+stateFromProblem p = array ((0, 0), (rows, columns)) cells
   where ((0, 0), (rn, cn)) = bounds p
         rows    = 2*rn + 2
         columns = 2*cn + 2
-        constraints = [((r, c), Space dotPossibilities) | r <- [0, 2 .. 2*rn+2], c <- [0, 2 .. 2*cn+2]]
-         ++ [((r, c), Line [False, True]) | r <- [0, 2 .. 2*rn+2], c <- [1, 3 .. 2*cn+1]]
-         ++ [((r, c), Line [False, True]) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
-         ++ [((2*r+1, 2*c+1), Space (possibilitiesForConstraint (p!(r, c))))| r <- [0 .. rn], c <- [0 .. cn]]
+        cells = [((r, c), Space flListXing) | r <- [0, 2 .. 2*rn+2], c <- [0, 2 .. 2*cn+2]]
+             ++ [((r, c), Line [False, True]) | r <- [0, 2 .. 2*rn+2], c <- [1, 3 .. 2*cn+1]]
+             ++ [((r, c), Line [False, True]) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
+             ++ [((2*r+1, 2*c+1), Space (flListForConstraint (p!(r, c))))| r <- [0 .. rn], c <- [0 .. cn]]
 
 narrow :: (Int, Int) -> State -> Maybe State
 narrow i@(r,c) state = if not (inRange (bounds state) i) then Just state else
@@ -156,7 +153,6 @@ directions = [ (0, 1)
 
 (.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
 (a, b) .+ (c, d) = (a+c, b+d)
-
 
 move :: (Int, Int) -> Direction -> State -> Maybe State
 move pos dir state = do

@@ -10,6 +10,7 @@ import Data.Foldable (foldrM)
 import Data.Maybe (isJust)
 import Data.List (find)
 import System.Environment
+import qualified Data.Set as Set
 
 data Constraint = Unconstrained | Exactly Int deriving (Eq)
 instance Show Constraint where
@@ -82,8 +83,29 @@ stateFromProblem p = array ((0, 0), (rows, columns)) cells
              ++ [((r, c), Line [False, True]) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
              ++ [((2*r+1, 2*c+1), Space (flListForConstraint (p!(r, c))))| r <- [0 .. rn], c <- [0 .. cn]]
 
-narrow :: (Int, Int) -> State -> Maybe State
-narrow i@(r,c) state = if not (inRange (bounds state) i) then Just state else
+type Direction = (Int, Int)
+directions4 :: [Direction] -- right, down, left, up
+directions4 = [ (0, 1)
+             , (1, 0)
+             , (0,-1)
+             , (-1,0)
+             ]
+directions8 :: [Direction] -- right down, down left, left up, up right
+directions8 = directions4 ++ [ (1,  1)
+                             , (1, -1)
+                             , (-1,-1)
+                             , (-1, 1)
+                             ]
+
+
+(.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
+(a, b) .+ (c, d) = (a+c, b+d)
+
+
+narrow :: Set.Set (Int, Int) -> State -> Maybe State
+narrow seed state = if Set.null seed then Just state else
+    let (i@(r,c), seed') = Set.deleteFindMin seed in
+      if not (inRange (bounds state) i) then narrow seed' state else
     case state!i of
       Line ls -> do
         let ls' = filter (match (r-1, c) state bottom)
@@ -93,11 +115,9 @@ narrow i@(r,c) state = if not (inRange (bounds state) i) then Just state else
         if null ls' 
           then Nothing 
           else if ls' == ls 
-            then Just state 
-            else Just (state // [(i, Line ls')]) >>= narrow (r-1, c)
-                                                 >>= narrow (r, c+1)
-                                                 >>= narrow (r+1, c)
-                                                 >>= narrow (r, c-1)
+            then narrow seed' state 
+            else let newSeeds = Set.fromList $ map (i .+) directions4
+                 in narrow (Set.union seed' newSeeds) (state // [(i, Line ls')])
       Space ss -> do
         let ss' = filter ((matchl (r-1, c) state).top)
                 $ filter ((matchl (r, c+1) state).right)
@@ -111,15 +131,9 @@ narrow i@(r,c) state = if not (inRange (bounds state) i) then Just state else
         if null ss'
           then Nothing
           else if ss' == ss
-            then Just state
-            else Just (state // [(i, Space ss')]) >>= narrow (r-1, c)
-                                                  >>= narrow (r, c+1)
-                                                  >>= narrow (r+1, c)
-                                                  >>= narrow (r, c-1)
-                                                  >>= narrow (r-1, c-1)
-                                                  >>= narrow (r-1, c+1)
-                                                  >>= narrow (r+1, c-1)
-                                                  >>= narrow (r+1, c+1)
+            then narrow seed' state
+            else let newSeeds = Set.fromList $ map (i .+) directions8
+                 in narrow (Set.union seed' newSeeds) (state // [(i, Space ss')])
 
 match :: (Int, Int) -> State -> (FourLines -> Bool) -> Bool -> Bool
 match i state f x = (not (inRange (bounds state) i)) 
@@ -141,36 +155,27 @@ match2 i state f1 x1 f2 x2 = (not (inRange (bounds state) i))
           check _ = undefined -- can't happen
 
 narrowAll :: State -> Maybe State
-narrowAll state = foldrM narrow state (indices state)
-
-type Direction = (Int, Int)
-directions :: [Direction]
-directions = [ (0, 1)
-             , (1, 0)
-             , (0,-1)
-             , (-1,0)
-             ]
-
-(.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
-(a, b) .+ (c, d) = (a+c, b+d)
+narrowAll state = narrow (Set.fromList (indices state)) state
 
 move :: (Int, Int) -> Direction -> State -> Maybe State
 move pos dir state = do
           let viaLine = pos .+ dir
           let toDot = pos .+ dir .+ dir
+          let affected = Set.fromList $ map (viaLine .+) directions4
           unless (inRange (bounds state) toDot) Nothing
           case state!viaLine of
             Line [True] -> Just state
-            Line [False, True] -> Just (state // [(viaLine,Line [True])]) >>= narrow toDot
+            Line [False, True] -> narrow affected (state // [(viaLine,Line [True])])
             _ -> Nothing
 
-zeroOffTrailLines :: [(Int, Int)] -> State -> Maybe State
-zeroOffTrailLines trail state = foldrM zero state (indices state)
+zeroRemainingLines :: [(Int, Int)] -> State -> Maybe State
+zeroRemainingLines trail state = foldrM zero state (indices state) >>= narrowAll
     where zero i s = if i `elem` onTrail
                             then Just s
                             else case s!i of
-                              Line _ -> Just (s // [(i, Line [False])]) >>= narrow i
-                              _      -> Just s
+                              Line [True] -> Nothing
+                              Line _      -> Just (s // [(i, Line [False])])
+                              _           -> Just s
           onTrail = zipWith middle trail (tail trail ++ [head trail])
           middle (a, b) (c, d) = ((a+c) `div` 2, (b+d) `div` 2)
 
@@ -186,14 +191,14 @@ solve' :: [(Int, Int)] -> State -> Maybe State
 solve' is state = untilJust (\i -> solve'' i i [] state) is
 
 solve'' :: (Int, Int) -> (Int, Int) -> [(Int, Int)] -> State -> Maybe State
-solve'' goal pos trail state = untilJust f directions
+solve'' goal pos trail state = untilJust f directions4
             where f dir = do
                       let newPos = pos .+ dir .+ dir
                       when (newPos `elem` trail) Nothing
                       newState <- move pos dir state
                       let newTrail = newPos:trail
                       if newPos == goal
-                        then zeroOffTrailLines newTrail newState
+                        then zeroRemainingLines newTrail newState
                         else solve'' goal newPos newTrail newState
 
 startingPositions :: State -> [(Int, Int)]

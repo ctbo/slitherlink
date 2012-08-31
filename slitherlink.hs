@@ -114,21 +114,44 @@ stateFromProblem p = array ((-1, -1), (rn+1, cn+1)) cells
           xform (Exactly n) = filter ((== n) . countBoxLines) slListAll
 
 type Direction = (Int, Int)
-directions4 :: [Direction] -- right, down, left, up
-directions4 = [ (0, 1)
+directions6 :: [Direction] -- right, down, left, up, up&left, down&right
+directions6 = [ (0, 1)
              , (1, 0)
              , (0,-1)
              , (-1,0)
+             , (-1, -1)
+             , (1, 1)
              ]
-directions8 :: [Direction] -- right down, down left, left up, up right
-directions8 = directions4 ++ [ (1,  1)
-                             , (1, -1)
-                             , (-1,-1)
-                             , (-1, 1)
-                             ]
 
 (.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
 (a, b) .+ (c, d) = (a+c, b+d)
+
+narrow :: Set.Set (Int, Int) -> State -> Maybe State
+narrow seed state = if Set.null seed then Just state else
+    let (i@(r,c), seed') = Set.deleteFindMin seed in
+      if not (inRange (bounds state) i) 
+        then narrow seed' state 
+        else do
+          let sls = state!i
+          let sls' = filter (match state (r-1, c-1) [(right, up), (bottom, totheleft)])
+                   $ filter (match state (r-1, c  ) [(bottom, top), (left, up)])
+                   $ filter (match state (r,   c-1) [(top, totheleft), (right, left)])
+                   $ filter (match state (r,   c+1) [(totheleft, top), (left, right)])
+                   $ filter (match state (r+1, c  ) [(up, left), (top, bottom)])
+                   $ filter (match state (r+1, c+1) [(up, right), (totheleft, bottom)])    
+                   sls
+          if null sls'
+             then Nothing
+             else if sls' == sls
+                     then narrow seed' state
+                     else let newSeeds = Set.fromList $ map (i .+) directions6
+                          in narrow (Set.union seed' newSeeds) (state // [(i, sls')])
+                 
+
+match :: State -> (Int, Int) -> [(SixLines->Bool, SixLines->Bool)] -> SixLines -> Bool
+match state i fps thiscell = (not (inRange (bounds state) i)) || all pairmatch fps
+    where pairmatch (otherf, thisf) = any ((==thisf thiscell) . otherf) othercell
+          othercell = state!i
 
 {-
 narrow :: Set.Set (Int, Int) -> State -> Maybe State

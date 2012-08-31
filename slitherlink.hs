@@ -156,6 +156,20 @@ match state i fps thiscell = (not (inRange (bounds state) i)) || all pairmatch f
 narrowAll :: State -> Maybe State
 narrowAll state = narrow (Set.fromList (indices state)) state
 
+untilJust :: (b -> Maybe a) -> [b] -> Maybe a
+untilJust f = join . find isJust . map f
+
+solve :: Problem -> Maybe State
+solve problem = do
+  state <- narrowAll $ stateFromProblem problem
+  solve' (indices state) state
+
+solve' :: [(Int, Int)] -> State -> Maybe State
+solve' [] state = Just state
+solve' (i:is) state = untilJust f $ state!i
+    where f sl = narrow neighbors (state // [(i, [sl])]) >>= solve' is
+          neighbors = Set.fromList $ map (i .+) directions6
+
 {-
 
 move :: (Int, Int) -> Direction -> State -> Maybe State

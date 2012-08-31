@@ -42,46 +42,76 @@ readProblem s = do
             let rows = length pl
             return $ listArray ((0, 0), (rows-1, columns-1)) $ concat pl 
 
-data FourLines = FourLines { top :: Bool
-                           , right :: Bool
-                           , bottom :: Bool
-                           , left :: Bool
+data SixLines = SixLines { top :: Bool
+                         , right :: Bool
+                         , bottom :: Bool
+                         , left :: Bool
+                         , up :: Bool
+                         , totheleft :: Bool
                            } deriving (Eq, Show)
 
-countLines :: FourLines -> Int
-countLines x = count top + count right + count bottom + count left
-           where count f = if f x then 1 else 0
+countLine :: SixLines -> (SixLines -> Bool) -> Int
+countLine x f =  if f x then 1 else 0
 
-flListAll :: [FourLines]
-flListAll = [FourLines t r b l | t <- [False, True]
-                                      , r <- [False, True]
-                                      , b <- [False, True]
-                                      , l <- [False, True]
-                                      ]
+countBoxLines :: SixLines -> Int
+countBoxLines x = sum $ map (countLine x) [top, right, bottom, left]
 
-flListForConstraint :: Constraint -> [FourLines]
-flListForConstraint Unconstrained = flListAll
-flListForConstraint (Exactly n) = filter ((==n) . countLines) flListAll
+countDotLines :: SixLines -> Int
+countDotLines x = sum $ map (countLine x) [up, top, left, totheleft]
 
-flListXing :: [FourLines]
-flListXing = filter (zeroOrTwo.countLines) flListAll
-    where zeroOrTwo 0 = True
-          zeroOrTwo 2 = True
-          zeroOrTwo _ = False
+slListAll :: [SixLines]
+slListAll = [x | t <- [False, True]
+               , r <- [False, True]
+               , b <- [False, True]
+               , l <- [False, True]
+               , u <- [False, True]
+               , tl <- [False, True]
+               , let x = SixLines t r b l u tl
+               , countDotLines x `elem` [0, 2]
+               ]
 
-data CellState = Line [Bool]
-               | Space [FourLines] deriving (Eq, Show)
+slListTop :: [SixLines]
+slListTop = [SixLines { top = False
+                      , right = False
+                      , bottom = b
+                      , left = False
+                      , up = False
+                      , totheleft = False
+                      } | b <- [False, True]]
+
+slListRight :: [SixLines]
+slListRight = filter (not.top)
+            $ filter (not.right)
+            $ filter (not.bottom) slListAll
+
+slListBottom :: [SixLines]
+slListBottom = filter (not.right)
+             $ filter (not.bottom)
+             $ filter (not.left) slListAll
+
+slListLeft :: [SixLines]
+slListLeft =  [SixLines { top = False
+                        , right = r
+                        , bottom = False
+                        , left = False
+                        , up = False
+                        , totheleft = False
+                        } | r <- [False, True]]
+
+type CellState = [SixLines]
 type State =  Array (Int, Int) CellState
 
+
 stateFromProblem :: Problem -> State
-stateFromProblem p = array ((0, 0), (rows, columns)) cells
-  where ((0, 0), (rn, cn)) = bounds p
-        rows    = 2*rn + 2
-        columns = 2*cn + 2
-        cells = [((r, c), Space flListXing) | r <- [0, 2 .. 2*rn+2], c <- [0, 2 .. 2*cn+2]]
-             ++ [((r, c), Line [False, True]) | r <- [0, 2 .. 2*rn+2], c <- [1, 3 .. 2*cn+1]]
-             ++ [((r, c), Line [False, True]) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
-             ++ [((2*r+1, 2*c+1), Space (flListForConstraint (p!(r, c))))| r <- [0 .. rn], c <- [0 .. cn]]
+stateFromProblem p = array ((-1, -1), (rn+1, cn+1)) cells
+    where ((0, 0), (rn, cn)) = bounds p
+          cells = [((r, c), xform (p!(r, c))) | r <- [0..rn], c <- [0..cn]]
+               ++ [((-1, c), slListTop) | c <- [0 .. cn+1]]
+               ++ [((r, cn+1), slListRight) | r <- [0 .. rn+1]]
+               ++ [((rn+1, c), slListBottom) | c <- [0 .. cn]]
+               ++ [((r, -1), slListLeft) | r <- [-1 .. rn+1]]
+          xform Unconstrained = slListAll
+          xform (Exactly n) = filter ((== n) . countBoxLines) slListAll
 
 type Direction = (Int, Int)
 directions4 :: [Direction] -- right, down, left, up
@@ -97,11 +127,10 @@ directions8 = directions4 ++ [ (1,  1)
                              , (-1, 1)
                              ]
 
-
 (.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
 (a, b) .+ (c, d) = (a+c, b+d)
 
-
+{-
 narrow :: Set.Set (Int, Int) -> State -> Maybe State
 narrow seed state = if Set.null seed then Just state else
     let (i@(r,c), seed') = Set.deleteFindMin seed in
@@ -237,6 +266,7 @@ main = getArgs >>= f >>= g where
       Left e -> putStrLn e
       Right p -> putStrLn $ showSolution p $ solve p
 
+-}
 
 -- stuff for interactive experiments
 
@@ -258,6 +288,7 @@ sampleProblem = case readProblem sampleProblemString of
   Right x -> x
   Left _ -> undefined -- can't happen
 
+{-
 showState :: State -> String
 showState state = unlines $ map oneLine [r0 .. rn]
   where ((r0, c0), (rn, cn)) = bounds state
@@ -275,4 +306,4 @@ showMaybeState :: Maybe State -> String
 showMaybeState Nothing = "No solution.\n"
 showMaybeState (Just state) = showState state
 
-
+-}

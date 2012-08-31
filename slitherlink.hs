@@ -6,7 +6,6 @@
 import Data.Array.IArray
 import Control.Monad
 import Control.Monad.Instances()
-import Data.Foldable (foldrM)
 import Data.Maybe (isJust)
 import Data.List (find)
 import System.Environment
@@ -101,7 +100,6 @@ slListLeft =  [SixLines { top = False
 type CellState = [SixLines]
 type State =  Array (Int, Int) CellState
 
-
 stateFromProblem :: Problem -> State
 stateFromProblem p = array ((-1, -1), (rn+1, cn+1)) cells
     where ((0, 0), (rn, cn)) = bounds p
@@ -147,7 +145,6 @@ narrow seed state = if Set.null seed then Just state else
                      else let newSeeds = Set.fromList $ map (i .+) directions6
                           in narrow (Set.union seed' newSeeds) (state // [(i, sls')])
                  
-
 match :: State -> (Int, Int) -> [(SixLines->Bool, SixLines->Bool)] -> SixLines -> Bool
 match state i fps thiscell = (not (inRange (bounds state) i)) || all pairmatch fps
     where pairmatch (otherf, thisf) = any ((==thisf thiscell) . otherf) othercell
@@ -169,78 +166,21 @@ solve' [] state = Just state
 solve' (i:is) state = untilJust f $ state!i
     where f sl = narrow neighbors (state // [(i, [sl])]) >>= solve' is
           neighbors = Set.fromList $ map (i .+) directions6
-
-{-
-
-move :: (Int, Int) -> Direction -> State -> Maybe State
-move pos dir state = do
-          let viaLine = pos .+ dir
-          let toDot = pos .+ dir .+ dir
-          let affected = Set.fromList $ map (viaLine .+) directions4
-          unless (inRange (bounds state) toDot) Nothing
-          case state!viaLine of
-            Line [True] -> Just state
-            Line [False, True] -> narrow affected (state // [(viaLine,Line [True])])
-            _ -> Nothing
-
-zeroRemainingLines :: [(Int, Int)] -> State -> Maybe State
-zeroRemainingLines trail state = foldrM zero state (indices state) >>= narrowAll
-    where zero i s = if i `elem` onTrail
-                            then Just s
-                            else case s!i of
-                              Line [True] -> Nothing
-                              Line _      -> Just (s // [(i, Line [False])])
-                              _           -> Just s
-          onTrail = zipWith middle trail (tail trail ++ [head trail])
-          middle (a, b) (c, d) = ((a+c) `div` 2, (b+d) `div` 2)
-
-untilJust :: (b -> Maybe a) -> [b] -> Maybe a
-untilJust f = join . find isJust . map f
-
-solve :: Problem -> Maybe State
-solve problem = do
-  state <- narrowAll $ stateFromProblem problem
-  solve' (startingPositions state) state
-
-solve' :: [(Int, Int)] -> State -> Maybe State
-solve' is state = untilJust (\i -> solve'' i i [] state) is
-
-solve'' :: (Int, Int) -> (Int, Int) -> [(Int, Int)] -> State -> Maybe State
-solve'' goal pos trail state = untilJust f directions4
-            where f dir = do
-                      let newPos = pos .+ dir .+ dir
-                      when (newPos `elem` trail) Nothing
-                      newState <- move pos dir state
-                      let newTrail = newPos:trail
-                      if newPos == goal
-                        then zeroRemainingLines newTrail newState
-                        else solve'' goal newPos newTrail newState
-
-startingPositions :: State -> [(Int, Int)]
-startingPositions state = if null s then evenIndices else [head s]
-    where s = filter (hasLine.(state!)) evenIndices
-          ((0, 0), (rn, cn)) = bounds state
-          evenIndices = [(r, c) | r <- [0, 2 .. rn], c <- [0, 2 .. cn]]
-        
-hasLine :: CellState -> Bool
-hasLine (Space ls) = not (FourLines False False False False `elem` ls)
-hasLine _          = undefined -- can't happen
+--TODO: Check if solution consists of a single loop. Might be more than one.
 
 showSolution :: Problem -> Maybe State -> String
-showSolution problem (Just state) = unlines $ map oneLine [r0 .. rn]
+showSolution problem (Just state) = concat $ map twoLines [r0 .. rn]
   where ((r0, c0), (rn, cn)) = bounds state
-        oneLine r = concat $ map (oneCell r) [c0 .. cn]
-        oneCell r c 
-          | even r && even c = showDot $ state ! (r, c)
-          | odd r && odd c = showConstraint (((r-1) `div` 2), ((c-1) `div` 2))
-          | otherwise = showLine (isVertical r) $ state ! (r, c)
-        isVertical = odd
-        showLine vertical s = case s of
-          Line [True] -> if vertical then "|" else "-"
-          Line _      -> " "
-          _           -> undefined -- can't happen
-        showDot s = if hasLine s then "+" else " "
-        showConstraint i = show $ problem!i
+        twoLines r = unlines [oddLine r, evenLine r]
+        oddLine r = concat $ map (oddPair r) [c0 .. cn]
+        oddPair r c = dot r c ++ hLine r c
+        dot r c = if countDotLines (unwrap r c) == 0 then " " else "+"
+        hLine r c = if top (unwrap r c) then "-" else " "
+        evenLine r = concat $ map (evenPair r) [c0 .. cn]
+        evenPair r c = vLine r c ++ square r c
+        vLine r c = if left (unwrap r c) then "|" else " "
+        square r c = if inRange (bounds problem) (r, c) then show $ problem!(r, c) else " "
+        unwrap r c = head $ state!(r, c)
 showSolution _ _ = "No solution.\n"
 
 main :: IO ()
@@ -252,7 +192,6 @@ main = getArgs >>= f >>= g where
       Left e -> putStrLn e
       Right p -> putStrLn $ showSolution p $ solve p
 
--}
 
 -- stuff for interactive experiments
 

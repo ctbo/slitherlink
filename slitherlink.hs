@@ -153,61 +153,10 @@ match state i fps thiscell = (not (inRange (bounds state) i)) || all pairmatch f
     where pairmatch (otherf, thisf) = any ((==thisf thiscell) . otherf) othercell
           othercell = state!i
 
-{-
-narrow :: Set.Set (Int, Int) -> State -> Maybe State
-narrow seed state = if Set.null seed then Just state else
-    let (i@(r,c), seed') = Set.deleteFindMin seed in
-      if not (inRange (bounds state) i) then narrow seed' state else
-    case state!i of
-      Line ls -> do
-        let ls' = filter (match (r-1, c) state bottom)
-                $ filter (match (r, c+1) state left)
-                $ filter (match (r+1, c) state top)
-                $ filter (match (r, c-1) state right) ls
-        if null ls' 
-          then Nothing 
-          else if ls' == ls 
-            then narrow seed' state 
-            else let newSeeds = Set.fromList $ map (i .+) directions4
-                 in narrow (Set.union seed' newSeeds) (state // [(i, Line ls')])
-      Space ss -> do
-        let ss' = filter ((matchl (r-1, c) state).top)
-                $ filter ((matchl (r, c+1) state).right)
-                $ filter ((matchl (r+1, c) state).bottom)
-                $ filter ((matchl (r, c-1) state).left) 
-                $ filter (\x -> match2 (r-1, c-1) state bottom (left x) right (top x))
-                $ filter (\x -> match2 (r-1, c+1) state bottom (right x) left (top x ))
-                $ filter (\x -> match2 (r+1, c-1) state top (left x) right (bottom x))
-                $ filter (\x -> match2 (r+1, c+1) state top (right x) left (bottom x)) 
-                ss
-        if null ss'
-          then Nothing
-          else if ss' == ss
-            then narrow seed' state
-            else let newSeeds = Set.fromList $ map (i .+) directions8
-                 in narrow (Set.union seed' newSeeds) (state // [(i, Space ss')])
-
-match :: (Int, Int) -> State -> (FourLines -> Bool) -> Bool -> Bool
-match i state f x = (not (inRange (bounds state) i)) 
-                || check (state!i)
-    where check (Space xs) = any ((==x).f) xs
-          check _ = undefined -- can't happen
-
-matchl :: (Int, Int) -> State -> Bool -> Bool
-matchl i state x = if inRange (bounds state) i
-                      then check (state!i)
-                      else x == False -- no lines allowed outside grid
-    where check (Line ls) = x `elem` ls
-          check _ = undefined -- can't happen
-
-match2 :: (Int, Int) -> State -> (FourLines -> Bool) -> Bool -> (FourLines -> Bool) -> Bool -> Bool
-match2 i state f1 x1 f2 x2 = (not (inRange (bounds state) i)) 
-                || check (state!i)
-    where check (Space xs) = any (\x -> f1 x == x1 && f2 x == x2) xs
-          check _ = undefined -- can't happen
-
 narrowAll :: State -> Maybe State
 narrowAll state = narrow (Set.fromList (indices state)) state
+
+{-
 
 move :: (Int, Int) -> Direction -> State -> Maybe State
 move pos dir state = do
@@ -311,22 +260,15 @@ sampleProblem = case readProblem sampleProblemString of
   Right x -> x
   Left _ -> undefined -- can't happen
 
-{-
 showState :: State -> String
 showState state = unlines $ map oneLine [r0 .. rn]
   where ((r0, c0), (rn, cn)) = bounds state
         oneLine r = concat $ map (oneCell r) [c0 .. cn]
-        oneCell r c = showCell (isVertical r) $ state ! (r, c)
-        isVertical = odd
-        showCell vertical s = case s of
-          Line [False, True] -> " "
-          Line [False] -> "x"
-          Line [True] -> if vertical then "|" else "-"
-          Space fs -> ["0123456789ABCDEFGH" !! (length fs)]
-          _ -> undefined -- can't happen
+        oneCell r c = superhex $ length $ state ! (r, c)
+        superhex x
+          | x > 35 = "*"
+          | otherwise = ["0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" !! x]  
 
 showMaybeState :: Maybe State -> String
 showMaybeState Nothing = "No solution.\n"
 showMaybeState (Just state) = showState state
-
--}

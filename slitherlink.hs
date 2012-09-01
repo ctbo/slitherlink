@@ -47,7 +47,7 @@ data SixLines = SixLines { top :: Bool
                          , left :: Bool
                          , up :: Bool
                          , totheleft :: Bool
-                           } deriving (Eq, Show)
+                         } deriving (Eq, Show)
 
 countLine :: SixLines -> (SixLines -> Bool) -> Int
 countLine x f =  if f x then 1 else 0
@@ -177,10 +177,13 @@ visit i state = if inRange (bounds state) i && not (visited (cell))
 solve :: Problem -> Maybe State
 solve problem = do
   state <- narrowAll $ stateFromProblem problem
-  solve' (0,1) (0,1) state
+  solve' (startingPositions state) state
 
-solve' :: (Int, Int) -> (Int, Int) -> State -> Maybe State
-solve' goal pos state = untilJust f directions4
+solve' :: [(Int, Int)] -> State -> Maybe State
+solve' is state = untilJust (\i -> solve'' i i state) is
+
+solve'' :: (Int, Int) -> (Int, Int) -> State -> Maybe State
+solve'' goal pos state = untilJust f directions4
     where f (dir, line) = do
             let pos' = pos .+ dir
             state' <- visit pos' state
@@ -193,7 +196,7 @@ solve' goal pos state = untilJust f directions4
                                    $ state' // [(pos, CellState sls' (visited (state'!pos)))]
             if (pos' == goal)
                then zeroRemainingLines state''
-               else solve' goal pos' state''
+               else solve'' goal pos' state''
 
 zeroRemainingLines :: State -> Maybe State
 zeroRemainingLines state = foldM zero state (indices state) >>= narrowAll
@@ -204,6 +207,12 @@ zeroRemainingLines state = foldM zero state (indices state) >>= narrowAll
                           let sls' = filter ((==0).countDotLines) sls
                           when (null sls') Nothing
                           Just (s // [(i, CellState sls' False)])
+
+startingPositions :: State -> [(Int, Int)]
+startingPositions state = if null s then indices state else [head s]
+  where s = filter lineAtDot $ indices state
+        lineAtDot i = let (CellState sls _) = state!i
+                      in all ((==2) . countDotLines) sls
 
 showSolution :: Problem -> Maybe State -> String
 showSolution problem (Just state) = concat $ map twoLines [r0 .. rn]

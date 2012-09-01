@@ -156,17 +156,33 @@ narrowAll state = narrow (Set.fromList (indices state)) state
 untilJust :: (b -> Maybe a) -> [b] -> Maybe a
 untilJust f = join . find isJust . map f
 
+directions4 :: [((Int, Int), SixLines -> Bool)]
+directions4 = [ ((0, 1), top)
+             , ((1, 0), left)
+             , ((0,-1), totheleft)
+             , ((-1,0), up)
+             ]
+
 solve :: Problem -> Maybe State
 solve problem = do
   state <- narrowAll $ stateFromProblem problem
-  solve' (indices state) state
+  solve' (0,1) (0,1) [] state
 
-solve' :: [(Int, Int)] -> State -> Maybe State
-solve' [] state = Just state
-solve' (i:is) state = untilJust f $ state!i
-    where f sl = narrow neighbors (state // [(i, [sl])]) >>= solve' is
-          neighbors = Set.fromList $ map (i .+) directions6
---TODO: Check if solution consists of a single loop. Might be more than one.
+solve' :: (Int, Int) -> (Int, Int) -> [(Int, Int)] -> State -> Maybe State
+solve' goal pos trail state = untilJust f directions4
+    where f (dir, line) = do
+            let pos' = pos .+ dir
+            when (pos' `elem` trail) Nothing
+            unless (inRange (bounds state) pos) Nothing
+            let sls = state!pos
+            let sls' = filter line sls
+            when (null sls') Nothing
+            state' <- if sls' == sls 
+                         then Just state 
+                         else narrow (Set.fromList $ map (pos .+) directions6) $ state // [(pos, sls')]
+            if (pos' == goal)
+               then Just state'
+               else solve' goal pos' (pos':trail) state'
 
 showSolution :: Problem -> Maybe State -> String
 showSolution problem (Just state) = concat $ map twoLines [r0 .. rn]
@@ -183,6 +199,7 @@ showSolution problem (Just state) = concat $ map twoLines [r0 .. rn]
         unwrap r c = head $ state!(r, c)
 showSolution _ _ = "No solution.\n"
 
+{-
 main :: IO ()
 main = getArgs >>= f >>= g where
     f [filename] = readFile filename
@@ -191,7 +208,7 @@ main = getArgs >>= f >>= g where
     g pString = case readProblem pString of
       Left e -> putStrLn e
       Right p -> putStrLn $ showSolution p $ solve p
-
+-}
 
 -- stuff for interactive experiments
 

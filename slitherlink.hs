@@ -97,17 +97,19 @@ slListLeft =  [SixLines { top = False
                         , totheleft = False
                         } | r <- [False, True]]
 
-type CellState = [SixLines]
+data CellState = CellState { slList :: [SixLines]
+                           , visited :: Bool
+                           }
 type State =  Array (Int, Int) CellState
 
 stateFromProblem :: Problem -> State
 stateFromProblem p = array ((-1, -1), (rn+1, cn+1)) cells
     where ((0, 0), (rn, cn)) = bounds p
-          cells = [((r, c), xform (p!(r, c))) | r <- [0..rn], c <- [0..cn]]
-               ++ [((-1, c), slListTop) | c <- [0 .. cn+1]]
-               ++ [((r, cn+1), slListRight) | r <- [0 .. rn+1]]
-               ++ [((rn+1, c), slListBottom) | c <- [0 .. cn]]
-               ++ [((r, -1), slListLeft) | r <- [-1 .. rn+1]]
+          cells = [((r, c), CellState (xform (p!(r, c))) False) | r <- [0..rn], c <- [0..cn]]
+               ++ [((-1, c), CellState slListTop False) | c <- [0 .. cn+1]]
+               ++ [((r, cn+1), CellState slListRight False) | r <- [0 .. rn+1]]
+               ++ [((rn+1, c), CellState slListBottom False) | c <- [0 .. cn]]
+               ++ [((r, -1), CellState slListLeft False) | r <- [-1 .. rn+1]]
           xform Unconstrained = slListAll
           xform (Exactly n) = filter ((== n) . countBoxLines) slListAll
 
@@ -130,7 +132,7 @@ narrow seed state = if Set.null seed then Just state else
       if not (inRange (bounds state) i) 
         then narrow seed' state 
         else do
-          let sls = state!i
+          let sls = slList $ state!i
           let sls' = filter (match state (r-1, c-1) [(right, up), (bottom, totheleft)])
                    $ filter (match state (r-1, c  ) [(bottom, top), (left, up)])
                    $ filter (match state (r,   c-1) [(top, totheleft), (right, left)])
@@ -143,12 +145,13 @@ narrow seed state = if Set.null seed then Just state else
              else if sls' == sls
                      then narrow seed' state
                      else let newSeeds = Set.fromList $ map (i .+) directions6
-                          in narrow (Set.union seed' newSeeds) (state // [(i, sls')])
+                          in narrow (Set.union seed' newSeeds) 
+                                    (state // [(i, CellState { slList=sls', visited = visited (state!i) })])
                  
 match :: State -> (Int, Int) -> [(SixLines->Bool, SixLines->Bool)] -> SixLines -> Bool
 match state i fps thiscell = (not (inRange (bounds state) i)) || all pairmatch fps
     where pairmatch (otherf, thisf) = any ((==thisf thiscell) . otherf) othercell
-          othercell = state!i
+          othercell = slList $ state!i
 
 narrowAll :: State -> Maybe State
 narrowAll state = narrow (Set.fromList (indices state)) state
@@ -163,42 +166,44 @@ directions4 = [ ((0, 1), top)
              , ((-1,0), up)
              ]
 
+visit :: (Int, Int) -> State -> Maybe State
+visit i state = if inRange (bounds state) i && not (visited (cell))
+                   then Just (state // [(i, CellState { slList = slList cell
+                                                     , visited = True 
+                                                     })])
+                   else Nothing
+    where cell = state!i
+
 solve :: Problem -> Maybe State
 solve problem = do
   state <- narrowAll $ stateFromProblem problem
-  solve' (0,1) (0,1) [] state
+  solve' (0,1) (0,1) state
 
-solve' :: (Int, Int) -> (Int, Int) -> [(Int, Int)] -> State -> Maybe State
-solve' goal pos trail state = untilJust f directions4
+solve' :: (Int, Int) -> (Int, Int) -> State -> Maybe State
+solve' goal pos state = untilJust f directions4
     where f (dir, line) = do
             let pos' = pos .+ dir
-            when (pos' `elem` trail) Nothing
-            unless (inRange (bounds state) pos) Nothing
-            let sls = state!pos
+            state' <- visit pos' state
+            let sls = slList $ state'!pos
             let sls' = filter line sls
             when (null sls') Nothing
-            state' <- if sls' == sls 
-                         then Just state 
-                         else narrow (Set.fromList $ map (pos .+) directions6) $ state // [(pos, sls')]
+            state'' <- if sls' == sls 
+                         then Just state'
+                         else narrow (Set.fromList $ map (pos .+) directions6) 
+                                   $ state' // [(pos, CellState sls' (visited (state'!pos)))]
             if (pos' == goal)
-               then do
-                 solution <- solve'' (indices state') state'
-                 if allDotsOnTrail trail solution
-                    then return solution
-                    else Nothing
-               else solve' goal pos' (pos':trail) state'
+               then zeroRemainingLines state''
+               else solve' goal pos' state''
 
-allDotsOnTrail :: [(Int, Int)] -> State -> Bool
-allDotsOnTrail trail state = all onTrail $ assocs state
-   where onTrail (i,[sl]) = if countDotLines sl == 0
-                           then True
-                           else i `elem` trail
-
-solve'' :: [(Int, Int)] -> State -> Maybe State
-solve'' [] state = Just state
-solve'' (i:is) state = untilJust f $ state!i
-    where f sl = narrow neighbors (state // [(i, [sl])]) >>= solve'' is
-          neighbors = Set.fromList $ map (i .+) directions6
+zeroRemainingLines :: State -> Maybe State
+zeroRemainingLines state = foldM zero state (indices state) >>= narrowAll
+    where zero s i = if visited (s!i)
+                        then Just s
+                        else do
+                          let sls = slList (s!i)
+                          let sls' = filter ((==0).countDotLines) sls
+                          when (null sls') Nothing
+                          Just (s // [(i, CellState sls' False)])
 
 showSolution :: Problem -> Maybe State -> String
 showSolution problem (Just state) = concat $ map twoLines [r0 .. rn]
@@ -212,7 +217,7 @@ showSolution problem (Just state) = concat $ map twoLines [r0 .. rn]
         evenPair r c = vLine r c ++ square r c
         vLine r c = if left (unwrap r c) then "|" else " "
         square r c = if inRange (bounds problem) (r, c) then show $ problem!(r, c) else " "
-        unwrap r c = head $ state!(r, c)
+        unwrap r c = head $ slList $ state!(r, c)
 showSolution _ _ = "No solution.\n"
 
 main :: IO ()
@@ -248,7 +253,7 @@ showState :: State -> String
 showState state = unlines $ map oneLine [r0 .. rn]
   where ((r0, c0), (rn, cn)) = bounds state
         oneLine r = concat $ map (oneCell r) [c0 .. cn]
-        oneCell r c = superhex $ length $ state ! (r, c)
+        oneCell r c = superhex $ length $ slList $ state ! (r, c)
         superhex x
           | x > 35 = "*"
           | otherwise = ["0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" !! x]  

@@ -181,8 +181,14 @@ solve' goal pos trail state = untilJust f directions4
                          then Just state 
                          else narrow (Set.fromList $ map (pos .+) directions6) $ state // [(pos, sls')]
             if (pos' == goal)
-               then Just state'
+               then solve'' (indices state') state'
                else solve' goal pos' (pos':trail) state'
+
+solve'' :: [(Int, Int)] -> State -> Maybe State
+solve'' [] state = Just state
+solve'' (i:is) state = untilJust f $ state!i
+    where f sl = narrow neighbors (state // [(i, [sl])]) >>= solve'' is
+          neighbors = Set.fromList $ map (i .+) directions6
 
 showSolution :: Problem -> Maybe State -> String
 showSolution problem (Just state) = concat $ map twoLines [r0 .. rn]

@@ -181,8 +181,18 @@ solve' goal pos trail state = untilJust f directions4
                          then Just state 
                          else narrow (Set.fromList $ map (pos .+) directions6) $ state // [(pos, sls')]
             if (pos' == goal)
-               then solve'' (indices state') state'
+               then do
+                 solution <- solve'' (indices state') state'
+                 if allDotsOnTrail trail solution
+                    then return solution
+                    else Nothing
                else solve' goal pos' (pos':trail) state'
+
+allDotsOnTrail :: [(Int, Int)] -> State -> Bool
+allDotsOnTrail trail state = all onTrail $ assocs state
+   where onTrail (i,[sl]) = if countDotLines sl == 0
+                           then True
+                           else i `elem` trail
 
 solve'' :: [(Int, Int)] -> State -> Maybe State
 solve'' [] state = Just state
@@ -205,7 +215,6 @@ showSolution problem (Just state) = concat $ map twoLines [r0 .. rn]
         unwrap r c = head $ state!(r, c)
 showSolution _ _ = "No solution.\n"
 
-{-
 main :: IO ()
 main = getArgs >>= f >>= g where
     f [filename] = readFile filename
@@ -214,7 +223,6 @@ main = getArgs >>= f >>= g where
     g pString = case readProblem pString of
       Left e -> putStrLn e
       Right p -> putStrLn $ showSolution p $ solve p
--}
 
 -- stuff for interactive experiments
 

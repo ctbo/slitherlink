@@ -99,8 +99,8 @@ directions8 = directions4 ++ [ (1,  1)
 (.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
 (a, b) .+ (c, d) = (a+c, b+d)
 
-narrow :: Set.Set (Int, Int) -> State -> Maybe State
-narrow seed state = if Set.null seed then Just state else
+narrow :: Set.Set (Int, Int) -> State -> [State]
+narrow seed state = if Set.null seed then [state] else
     let (i@(r,c), seed') = Set.deleteFindMin seed in
       if not (inRange (bounds state) i) then narrow seed' state else
     case state!i of
@@ -110,7 +110,7 @@ narrow seed state = if Set.null seed then Just state else
                 $ filter (match (r+1, c) state top)
                 $ filter (match (r, c-1) state right) ls
         if null ls' 
-          then Nothing 
+          then [] 
           else if ls' == ls 
             then narrow seed' state 
             else let newSeeds = Set.fromList $ map (i .+) directions4
@@ -126,7 +126,7 @@ narrow seed state = if Set.null seed then Just state else
                 $ filter (\x -> match2 (r+1, c+1) state top (right x) left (bottom x)) 
                 ss
         if null ss'
-          then Nothing
+          then []
           else if ss' == ss
             then narrow seed' state
             else let newSeeds = Set.fromList $ map (i .+) directions8
@@ -151,45 +151,42 @@ match2 i state f1 x1 f2 x2 = (not (inRange (bounds state) i))
     where check (Space xs) = any (\x -> f1 x == x1 && f2 x == x2) xs
           check _ = undefined -- can't happen
 
-narrowAll :: State -> Maybe State
+narrowAll :: State -> [State]
 narrowAll state = narrow (Set.fromList (indices state)) state
 
-move :: (Int, Int) -> Direction -> State -> Maybe State
+move :: (Int, Int) -> Direction -> State -> [State]
 move pos dir state = do
           let viaLine = pos .+ dir
-          unless (inRange (bounds state) viaLine) Nothing
+          unless (inRange (bounds state) viaLine) []
           let Line bs v = state!viaLine
-          when v Nothing
+          when v []
           let newState = state // [(viaLine,Line [True] True)]
           let affected = Set.fromList $ map (viaLine .+) directions4
           case bs of
-            [True] -> Just newState
+            [True] -> [newState]
             [False, True] -> narrow affected newState
-            _ -> Nothing
+            _ -> []
 
-zeroRemainingLines :: State -> Maybe State
+zeroRemainingLines :: State -> [State]
 zeroRemainingLines state = foldM zero state (indices state) >>= narrowAll
     where zero s i = case s!i of
-                       Line [True]        True  -> Just s
-                       Line [False]       False -> Just s
-                       Line [True]        False -> Nothing
-                       Line [False, True] False -> Just (s // [(i, Line [False] False)])
+                       Line [True]        True  -> [s]
+                       Line [False]       False -> [s]
+                       Line [True]        False -> []
+                       Line [False, True] False -> [ s // [(i, Line [False] False)] ]
                        Line _             _     -> undefined -- can't happen
-                       _                        -> Just s
+                       _                        -> [s]
 
-untilJust :: (b -> Maybe a) -> [b] -> Maybe a
-untilJust f = join . find isJust . map f
-
-solve :: Problem -> Maybe State
+solve :: Problem -> [State]
 solve problem = do
   state <- narrowAll $ stateFromProblem problem
   solve' (startingPositions state) state
 
-solve' :: [(Int, Int)] -> State -> Maybe State
-solve' is state = untilJust (\i -> solve'' i i state) is
+solve' :: [(Int, Int)] -> State -> [State]
+solve' is state = concatMap (\i -> solve'' i i state) is
 
-solve'' :: (Int, Int) -> (Int, Int) -> State -> Maybe State
-solve'' goal pos state = untilJust f directions4
+solve'' :: (Int, Int) -> (Int, Int) -> State -> [State]
+solve'' goal pos state = concatMap f directions4
             where f dir = do
                       newState <- move pos dir state
                       let newPos = pos .+ dir .+ dir
@@ -207,8 +204,8 @@ hasLine :: CellState -> Bool
 hasLine (Space ls) = not (FourLines False False False False `elem` ls)
 hasLine _          = undefined -- can't happen
 
-showSolution :: Problem -> Maybe State -> String
-showSolution problem (Just state) = unlines $ map oneLine [r0 .. rn]
+showSolution :: Problem -> [State] -> String
+showSolution problem (state:states) = (unlines $ map oneLine [r0 .. rn]) ++ showSolution problem states
   where ((r0, c0), (rn, cn)) = bounds state
         oneLine r = concat $ map (oneCell r) [c0 .. cn]
         oneCell r c 
@@ -222,7 +219,7 @@ showSolution problem (Just state) = unlines $ map oneLine [r0 .. rn]
           _              -> undefined -- can't happen
         showDot s = if hasLine s then "+" else " "
         showConstraint i = show $ problem!i
-showSolution _ _ = "No solution.\n"
+showSolution _ _ = "No more solutions.\n"
 
 main :: IO ()
 main = getArgs >>= f >>= g where

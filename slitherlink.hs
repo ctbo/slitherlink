@@ -120,10 +120,10 @@ narrow seed state = if Set.null seed then Just state else
                 $ filter ((matchl (r, c+1) state).right)
                 $ filter ((matchl (r+1, c) state).bottom)
                 $ filter ((matchl (r, c-1) state).left) 
-                $ filter (\x -> match2 (r-1, c-1) state bottom (left x) right (top x))
-                $ filter (\x -> match2 (r-1, c+1) state bottom (right x) left (top x ))
-                $ filter (\x -> match2 (r+1, c-1) state top (left x) right (bottom x))
-                $ filter (\x -> match2 (r+1, c+1) state top (right x) left (bottom x)) 
+                $ filter (match2 (r-1, c-1) state [(bottom, left), (right, top)])
+                $ filter (match2 (r-1, c+1) state [(bottom, right), (left, top)])
+                $ filter (match2 (r+1, c-1) state [(top, left), (right, bottom)])
+                $ filter (match2 (r+1, c+1) state [(top, right), (left, bottom)]) 
                 ss
         if null ss'
           then Nothing
@@ -145,11 +145,10 @@ matchl i state x = if inRange (bounds state) i
     where check (Line ls _) = x `elem` ls
           check _ = undefined -- can't happen
 
-match2 :: (Int, Int) -> State -> (FourLines -> Bool) -> Bool -> (FourLines -> Bool) -> Bool -> Bool
-match2 i state f1 x1 f2 x2 = (not (inRange (bounds state) i)) 
-                || check (state!i)
-    where check (Space xs) = any (\x -> f1 x == x1 && f2 x == x2) xs
-          check _ = undefined -- can't happen
+match2 :: (Int, Int) -> State -> [(FourLines->Bool, FourLines->Bool)] -> FourLines -> Bool
+match2 i state fps thiscell = (not (inRange (bounds state) i)) || all pairmatch fps
+    where pairmatch (otherf, thisf) = any ((==thisf thiscell) . otherf) othercell
+          Space othercell = state!i
 
 narrowAll :: State -> Maybe State
 narrowAll state = narrow (Set.fromList (indices state)) state

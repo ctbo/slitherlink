@@ -6,8 +6,7 @@
 import Data.Array.IArray
 import Control.Monad
 import Control.Monad.Instances()
-import Data.Maybe (isJust)
-import Data.List (find)
+import Data.List (delete)
 import System.Environment
 import qualified Data.Set as Set
 
@@ -154,52 +153,48 @@ match2 i state f1 x1 f2 x2 = (not (inRange (bounds state) i))
 narrowAll :: State -> [State]
 narrowAll state = narrow (Set.fromList (indices state)) state
 
-move :: (Int, Int) -> Direction -> State -> [State]
-move pos dir state = do
-          let viaLine = pos .+ dir
-          unless (inRange (bounds state) viaLine) []
-          let Line bs v = state!viaLine
-          when v []
-          let newState = state // [(viaLine,Line [True] True)]
-          let affected = Set.fromList $ map (viaLine .+) directions4
-          case bs of
-            [True] -> [newState]
-            [False, True] -> narrow affected newState
-            _ -> []
-
-zeroRemainingLines :: State -> [State]
-zeroRemainingLines state = foldM zero state (indices state) >>= narrowAll
-    where zero s i = case s!i of
-                       Line [True]        True  -> [s]
-                       Line [False]       False -> [s]
-                       Line [True]        False -> []
-                       Line [False, True] False -> [ s // [(i, Line [False] False)] ]
-                       Line _             _     -> undefined -- can't happen
-                       _                        -> [s]
-
 solve :: Problem -> [State]
 solve problem = do
-  state <- narrowAll $ stateFromProblem problem
-  solve' (startingPositions state) state
+    state <- narrowAll $ stateFromProblem problem
+    let ((0, 0), (rn, cn)) = bounds state
+    let evenGrid = [(r, c) | r <- [0, 2 .. rn], c <- [0, 2 .. cn]]
+    solution <- foldM solve' state evenGrid
+    return solution -- TODO: only allow single loops
 
-solve' :: [(Int, Int)] -> State -> [State]
-solve' is state = concatMap (\i -> solve'' i i state) is
+solve' :: State -> (Int, Int) -> [State]
+solve' state i = concatMap fix $ possibilities $ state!i
+    where possibilities (Space list) = list
+          possibilities _            = undefined -- can't happen
+          fix ss = narrow neighbors $ state // [(i, Space [ss])]
+          neighbors = Set.fromList $ map (i .+) directions8
 
-solve'' :: (Int, Int) -> (Int, Int) -> State -> [State]
-solve'' goal pos state = concatMap f directions4
-            where f dir = do
-                      newState <- move pos dir state
-                      let newPos = pos .+ dir .+ dir
-                      if newPos == goal
-                        then zeroRemainingLines newState
-                        else solve'' goal newPos newState
+type LabelArray = Array (Int, Int) (Int, Int)
+detectLoops' :: State -> (LabelArray, [(Int, Int)]) -> (Int, Int) -> (LabelArray, [(Int, Int)])
+detectLoops' state (labels, seeds) i@(r, c) = 
+    let Space list = state!i
+        fl = head list
+    in case fl of
+       --        top   right bottm left
+       FourLines False False False False -> (labels                          , seeds)
+       FourLines False True  True  False -> (labels // [(i, i)]              , i:seeds)
+       FourLines True  _     _     False -> (labels // [(i, labels!(r-2, c))], seeds)
+       FourLines False _     _     True  -> (labels // [(i, labels!(r, c-2))], seeds)
+       FourLines True  _     _     True  -> 
+          let above     = labels!(r-2, c)
+              totheleft = labels!(r, c-2)
+          in (labels // [(i, above)], if above == totheleft then seeds else delete totheleft seeds)
+       FourLines _     _     _     _     -> undefined -- can't happen
 
-startingPositions :: State -> [(Int, Int)]
-startingPositions state = if null s then evenIndices else [head s]
-    where s = filter (hasLine.(state!)) evenIndices
-          ((0, 0), (rn, cn)) = bounds state
-          evenIndices = [(r, c) | r <- [0, 2 .. rn], c <- [0, 2 .. cn]]
-        
+detectLoops :: State -> [(Int, Int)]
+detectLoops state = snd $ foldl (detectLoops' state) (array (bounds state) [], []) evenGrid
+    where ((0, 0), (rn, cn)) = bounds state
+          evenGrid = [(r, c) | r <- [0, 2 .. rn], c <- [0, 2 .. cn]]
+
+singleLoop :: State -> [State]
+singleLoop state = if length (detectLoops state) == 1
+                      then [state]
+                      else []
+
 hasLine :: CellState -> Bool
 hasLine (Space ls) = not (FourLines False False False False `elem` ls)
 hasLine _          = undefined -- can't happen

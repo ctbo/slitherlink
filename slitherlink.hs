@@ -149,9 +149,10 @@ narrow seed state = if Set.null seed then Just state else
                                     (state // [(i, CellState { slList=sls', visited = visited (state!i) })])
                  
 match :: State -> (Int, Int) -> [(SixLines->Bool, SixLines->Bool)] -> SixLines -> Bool
-match state i fps thiscell = (not (inRange (bounds state) i)) || all pairmatch fps
-    where pairmatch (otherf, thisf) = any ((==thisf thiscell) . otherf) othercell
-          othercell = slList $ state!i
+match state i fps thiscell = (not (inRange (bounds state) i)) || any ok otherlist
+    where otherlist = slList $ state!i
+          ok othercell = all pairmatch fps
+              where pairmatch (otherf, thisf) = thisf thiscell == otherf othercell
 
 narrowAll :: State -> Maybe State
 narrowAll state = narrow (Set.fromList (indices state)) state

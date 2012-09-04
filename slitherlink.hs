@@ -146,9 +146,10 @@ matchl i state x = if inRange (bounds state) i
           check _ = undefined -- can't happen
 
 match2 :: (Int, Int) -> State -> [(FourLines->Bool, FourLines->Bool)] -> FourLines -> Bool
-match2 i state fps thiscell = (not (inRange (bounds state) i)) || all pairmatch fps
-    where pairmatch (otherf, thisf) = any ((==thisf thiscell) . otherf) othercell
-          Space othercell = state!i
+match2 i state fps thiscell = (not (inRange (bounds state) i)) || any ok otherlist
+    where Space otherlist = state!i
+          ok othercell = all pairmatch fps
+              where pairmatch (otherf, thisf) = thisf thiscell == otherf othercell
 
 narrowAll :: State -> Maybe State
 narrowAll state = narrow (Set.fromList (indices state)) state

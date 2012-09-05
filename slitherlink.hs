@@ -109,10 +109,27 @@ step state pattern = concatMap f $ pVal pattern
            let sMask' = (sMask state) .|. (pMask pattern)
            let sVal' = (sVal state) .|. val
            let (touched, untouched) = partition (\x -> (x .&. val) /= 0) (loops state)
-           let joinedLoop = foldl (.|.) val touched -- TODO don't want to create 0 loop
-           let loops' = joinedLoop : untouched
+           let joinedLoop = foldl (.|.) val touched
+           let loops' = if val /= 0 then joinedLoop : untouched else untouched
+           -- TODO: broken: Two parrallel lines in square might join loop
            -- TODO: check for single loop
            [State {sMask=sMask', sVal=sVal', loops=loops', dotsMask = dotsMask state, linesMask = linesMask state}]
+
+showSolution :: Problem -> State -> String
+showSolution problem state = concatMap oneRow rNumbers
+    where ((0, 0), (rn, cn)) = bounds problem
+          bitsPerRow = 3*(cn+1) + 3
+          bitnoForSquare (r, c) = r * bitsPerRow + c * 3
+          t = testBit (sVal state)
+          rNumbers = [r | r <- [0 .. rn+1]]
+          cNumbers = [c | c <- [0 .. cn+1]]
+          oneRow r = fstLine r ++ "\n" ++ sndLine r ++ "\n"
+          fstLine r = concatMap (fstCell r) cNumbers
+          fstCell r c = (if t (bitnoForSquare (r, c)) then "+" else " ")
+                     ++ (if t (bitnoForSquare (r, c) + 2) then "-" else " ")
+          sndLine r = concatMap (sndCell r) cNumbers
+          sndCell r c = (if t (bitnoForSquare (r, c) + 1) then "|" else " ")
+                     ++ (if (inRange (bounds problem) (r, c)) then show (problem!(r,c)) else " ")
 
 {-
 main :: IO ()

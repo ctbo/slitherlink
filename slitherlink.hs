@@ -77,16 +77,23 @@ patternsFromProblem p = concatMap dotSquare [(r, c) | r <- [0..rn+1], c <- [0..c
               where b = bitnoForSquare i
                     b1 = b + bitsPerRow
                     mask = bit (b+1) .|. bit (b+2) .|. bit (b+4) .|. bit (b1+2)
-          dot i@(r, c) = [ Pattern { pMask = dotMask
-                                   , pVal  =  0 : map (.|. bit b) twoLines
+          dot i@(r, c) = [ Pattern { pMask = mask
+                                   , pVal  =  0 : twoLines
                                    } ]
               where b = bitnoForSquare i
-                    dotMask = dotUp .|. dotRight .|. dotDown .|. dotLeft
-                    dotUp = if r > 0 then bit (b - bitsPerRow + 1) else 0
-                    dotRight = if c <= cn then bit (b + 2) else 0
-                    dotDown = if r <= rn then bit (b + 1) else 0
-                    dotLeft = if c > 0 then bit (b - 1) else 0
-                    twoLines = filter ((==2) . popCount) $ allValsFromMask dotMask
+                    lineUp = if r > 0 then bit (b - bitsPerRow + 1) else 0 
+                    lineRight = if c <= cn then bit (b + 2) else 0 
+                    lineDown = if r <= rn then bit (b + 1) else 0 
+                    lineLeft = if c > 0 then bit (b - 1) else 0 
+                    mask = lineUp .|. lineRight .|. lineDown .|. lineLeft
+                    twoLines = map
+                      (
+                        (\x -> x .|. bit b)
+                      . (\x -> if x .&. lineUp /= 0 then x .|. bit (bitnoForSquare (r-1, c)) else x)
+                      . (\x -> if x .&. lineRight /= 0 then x .|. bit (bitnoForSquare (r, c+1)) else x)
+                      . (\x -> if x .&. lineDown /= 0 then x .|. bit (bitnoForSquare (r+1, c)) else x)
+                      . (\x -> if x .&. lineLeft /= 0 then x .|. bit (bitnoForSquare (r, c-1)) else x)
+                      ) $ filter ((==2) . popCount) $ allValsFromMask mask
 
 stateFromProblem :: Problem -> State
 stateFromProblem p = State { sMask = 0, sVal = 0, loops = [], dotsMask = dm, linesMask = lm }
@@ -108,9 +115,10 @@ step state pattern = concatMap f $ pVal pattern
            unless (((sVal state) `xor` val) .&. (sMask state) .&. (pMask pattern) == 0) []
            let sMask' = (sMask state) .|. (pMask pattern)
            let sVal' = (sVal state) .|. val
-           let (touched, untouched) = partition (\x -> (x .&. val) /= 0) (loops state)
+           let valDots = val .&. dotsMask state
+           let (touched, untouched) = partition (\x -> (x .&. valDots) /= 0) (loops state)
            let joinedLoop = foldl (.|.) val touched
-           let loops' = if val /= 0 then joinedLoop : untouched else untouched
+           let loops' = if valDots /= 0 then joinedLoop : untouched else untouched
            -- TODO: broken: Two parrallel lines in square might join loop
            -- TODO: check for single loop
            [State {sMask=sMask', sVal=sVal', loops=loops', dotsMask = dotsMask state, linesMask = linesMask state}]

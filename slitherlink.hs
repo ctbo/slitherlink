@@ -215,8 +215,8 @@ hasLine :: CellState -> Bool
 hasLine (Space ls) = not (FourLines False False False False `elem` ls)
 hasLine _          = undefined -- can't happen
 
-showSolution :: Problem -> [State] -> String
-showSolution problem (state:states) = (unlines $ map oneLine [r0 .. rn]) ++ showSolution problem states
+showSolution :: Problem -> State -> String
+showSolution problem state = (unlines $ map oneLine [r0 .. rn])
   where ((r0, c0), (rn, cn)) = bounds state
         oneLine r = concat $ map (oneCell r) [c0 .. cn]
         oneCell r c 
@@ -230,7 +230,6 @@ showSolution problem (state:states) = (unlines $ map oneLine [r0 .. rn]) ++ show
           _              -> undefined -- can't happen
         showDot s = if hasLine s then "+" else " "
         showConstraint i = show $ problem!i
-showSolution _ _ = "No more solutions.\n"
 
 main :: IO ()
 main = getArgs >>= f >>= g where
@@ -239,7 +238,10 @@ main = getArgs >>= f >>= g where
     f _          = error "Too many arguments."
     g pString = case readProblem pString of
       Left e -> putStrLn e
-      Right p -> putStrLn $ showSolution p $ solve p
+      Right p -> do
+            let solutions = solve p
+            putStr $ concatMap (showSolution p) $ take 2 solutions
+            putStrLn $ "Total number of solutions: " ++ show (length solutions)
 
 
 -- stuff for interactive experiments

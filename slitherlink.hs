@@ -139,7 +139,6 @@ showSolution problem state = concatMap oneRow rNumbers
           sndCell r c = (if t (bitnoForSquare (r, c) + 1) then "|" else " ")
                      ++ (if (inRange (bounds problem) (r, c)) then show (problem!(r,c)) else " ")
 
-{-
 main :: IO ()
 main = getArgs >>= f >>= g where
     f [filename] = readFile filename
@@ -147,8 +146,10 @@ main = getArgs >>= f >>= g where
     f _          = error "Too many arguments."
     g pString = case readProblem pString of
       Left e -> putStrLn e
-      Right p -> putStrLn $ showSolution p $ solve p
--}
+      Right p -> do
+            let solutions = solve p
+            putStr $ concatMap (showSolution p) $ take 2 solutions
+            putStrLn $ "Total number of solutions: " ++ show (length solutions)
 
 -- stuff for interactive experiments
 

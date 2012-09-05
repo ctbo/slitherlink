@@ -7,6 +7,7 @@ import Data.Array.IArray
 import Control.Monad
 import Control.Monad.Instances()
 import System.Environment
+import Data.List (partition)
 
 import Data.Bits hiding (popCount) -- popCount is buggy, rolling my own
 
@@ -50,7 +51,9 @@ data Pattern = Pattern { pMask :: Integer
                        , pVal :: [Integer]} deriving (Eq, Show)
 data State = State { sMask :: Integer
                    , sVal :: Integer
-                   , loops :: [Integer]} deriving (Eq, Show)
+                   , loops :: [Integer]
+                   , dotsMask :: Integer
+                   , linesMask :: Integer } deriving (Eq, Show)
 
 allValsFromMask :: Integer -> [Integer]
 allValsFromMask 0 = [0]
@@ -62,7 +65,7 @@ allValsFromMask x = do
 patternsFromProblem :: Problem -> [Pattern]
 patternsFromProblem p = concatMap dotSquare [(r, c) | r <- [0..rn+1], c <- [0..cn+1]]
     where ((0, 0), (rn, cn)) = bounds p
-          bitsPerRow = 3*(cn+1) + 2
+          bitsPerRow = 3*(cn+1) + 3
           bitnoForSquare (r, c) = r * bitsPerRow + c * 3
           dotSquare (i@(r, c)) = if r <= rn && c <= cn
                                    then dot i ++ square (i, p!i)
@@ -84,6 +87,32 @@ patternsFromProblem p = concatMap dotSquare [(r, c) | r <- [0..rn+1], c <- [0..c
                     dotDown = if r <= rn then bit (b + 1) else 0
                     dotLeft = if c > 0 then bit (b - 1) else 0
                     twoLines = filter ((==2) . popCount) $ allValsFromMask dotMask
+
+stateFromProblem :: Problem -> State
+stateFromProblem p = State { sMask = 0, sVal = 0, loops = [], dotsMask = dm, linesMask = lm }
+    where ((0, 0), (rn, cn)) = bounds p
+          bitsPerRow = 3*(cn+1) + 3
+          bitnoForSquare (r, c) = r * bitsPerRow + c * 3
+          grid = [(r, c) | r <- [0..rn+1], c <- [0..cn+1]]
+          bitnogrid = map bitnoForSquare grid
+          dm = foldl (.|.) 0 $ map bit bitnogrid
+          lm =   foldl (.|.) 0 (map (bit . (+1)) bitnogrid)
+             .|. foldl (.|.) 0 (map (bit . (+2)) bitnogrid)
+
+solve :: Problem -> [State]
+solve p = foldM step (stateFromProblem p) (patternsFromProblem p)
+
+step :: State -> Pattern -> [State]
+step state pattern = concatMap f $ pVal pattern
+     where f val = do
+           unless (((sVal state) `xor` val) .&. (sMask state) .&. (pMask pattern) == 0) []
+           let sMask' = (sMask state) .|. (pMask pattern)
+           let sVal' = (sVal state) .|. val
+           let (touched, untouched) = partition (\x -> (x .&. val) /= 0) (loops state)
+           let joinedLoop = foldl (.|.) val touched -- TODO don't want to create 0 loop
+           let loops' = joinedLoop : untouched
+           -- TODO: check for single loop
+           [State {sMask=sMask', sVal=sVal', loops=loops', dotsMask = dotsMask state, linesMask = linesMask state}]
 
 {-
 main :: IO ()

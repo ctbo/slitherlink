@@ -8,8 +8,13 @@ import Control.Monad
 import Control.Monad.Instances()
 import System.Environment
 
-import Data.Bits
+import Data.Bits hiding (popCount) -- popCount is buggy, rolling my own
 
+popCount :: Integer -> Int
+popCount = go 0
+    where
+        go c 0 = c
+        go c w = go (c+1) (w .&. (w - 1))
 
 data Constraint = Unconstrained | Exactly Int deriving (Eq)
 instance Show Constraint where
@@ -40,6 +45,45 @@ readProblem s = do
             unless (all ((== columns) . length) pl) $ Left "Problem not rectangular."
             let rows = length pl
             return $ listArray ((0, 0), (rows-1, columns-1)) $ concat pl 
+
+data Pattern = Pattern { pMask :: Integer
+                       , pVal :: [Integer]} deriving (Eq, Show)
+data State = State { sMask :: Integer
+                   , sVal :: Integer
+                   , loops :: [Integer]} deriving (Eq, Show)
+
+allValsFromMask :: Integer -> [Integer]
+allValsFromMask 0 = [0]
+allValsFromMask x = do
+    y <- allValsFromMask (x .&. (x-1))
+    [y, y .|. (x .&. (-x))]
+
+
+patternsFromProblem :: Problem -> [Pattern]
+patternsFromProblem p = concatMap dotSquare [(r, c) | r <- [0..rn+1], c <- [0..cn+1]]
+    where ((0, 0), (rn, cn)) = bounds p
+          bitsPerRow = 3*(cn+1) + 2
+          bitnoForSquare (r, c) = r * bitsPerRow + c * 3
+          dotSquare (i@(r, c)) = if r <= rn && c <= cn
+                                   then dot i ++ square (i, p!i)
+                                   else dot i
+          square (_, Unconstrained) = []
+          square (i, Exactly n) = [ Pattern { pMask = mask
+                                            , pVal  = filter ((==n) . popCount) $ allValsFromMask mask
+                                            } ]
+              where b = bitnoForSquare i
+                    b1 = b + bitsPerRow
+                    mask = bit (b+1) .|. bit (b+2) .|. bit (b+4) .|. bit (b1+2)
+          dot i@(r, c) = [ Pattern { pMask = dotMask
+                                   , pVal  =  0 : map (.|. bit b) twoLines
+                                   } ]
+              where b = bitnoForSquare i
+                    dotMask = dotUp .|. dotRight .|. dotDown .|. dotLeft
+                    dotUp = if r > 0 then bit (b - bitsPerRow + 1) else 0
+                    dotRight = if c <= cn then bit (b + 2) else 0
+                    dotDown = if r <= rn then bit (b + 1) else 0
+                    dotLeft = if c > 0 then bit (b - 1) else 0
+                    twoLines = filter ((==2) . popCount) $ allValsFromMask dotMask
 
 {-
 main :: IO ()

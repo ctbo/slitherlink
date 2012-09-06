@@ -106,6 +106,16 @@ stateFromProblem p = State { sMask = 0, sVal = 0, loops = [], dotsMask = dm, lin
           lm =   foldl (.|.) 0 (map (bit . (+1)) bitnogrid)
              .|. foldl (.|.) 0 (map (bit . (+2)) bitnogrid)
 
+partitionLoops :: State -> ([Integer], [Integer])
+partitionLoops state = partition isClosed (loops state)
+    where isClosed loop = popCount (loop .&. dotsMask state) == popCount (loop .&. linesMask state)
+
+tooManyLoops :: State -> Bool
+tooManyLoops state = closed > 1 || closed == 1 && open > 0
+    where (c, o) = partitionLoops state
+          closed = length c
+          open = length o
+
 solve :: Problem -> [State]
 solve p = foldM step (stateFromProblem p) (patternsFromProblem p)
 
@@ -119,9 +129,11 @@ step state pattern = concatMap f $ pVal pattern
            let (touched, untouched) = partition (\x -> (x .&. valDots) /= 0) (loops state)
            let joinedLoop = foldl (.|.) val touched
            let loops' = if valDots /= 0 then joinedLoop : untouched else untouched
-           -- TODO: broken: Two parrallel lines in square might join loop
-           -- TODO: check for single loop
-           [State {sMask=sMask', sVal=sVal', loops=loops', dotsMask = dotsMask state, linesMask = linesMask state}]
+           let state' = State {sMask=sMask', sVal=sVal', loops=loops'
+                              , dotsMask = dotsMask state, linesMask = linesMask state}
+           if tooManyLoops state'
+              then []
+              else [state']
 
 showSolution :: Problem -> State -> String
 showSolution problem state = concatMap oneRow rNumbers

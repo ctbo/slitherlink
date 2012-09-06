@@ -11,11 +11,23 @@ import Data.List (partition)
 
 import Data.Bits hiding (popCount) -- popCount is buggy, rolling my own
 
-popCount :: Integer -> Int
-popCount = go 0
+popCount' :: Integer -> Int
+popCount' = go 0
     where
         go c 0 = c
         go c w = go (c+1) (w .&. (w - 1))
+
+popCountN = 10
+
+popCountMask :: Integer
+popCountMask = shift 1 popCountN - 1
+
+popCountTable :: Array Integer Int
+popCountTable = listArray (0, popCountMask) $ map popCount' [0 .. popCountMask]
+
+popCount :: Integer -> Int
+popCount 0 = 0
+popCount x = popCountTable ! (x .&. popCountMask) + popCount (x `shiftR` popCountN)
 
 data Constraint = Unconstrained | Exactly Int deriving (Eq)
 instance Show Constraint where

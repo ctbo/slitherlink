@@ -55,12 +55,12 @@ data State = State { sMask :: Integer
                    , dotsMask :: Integer
                    , linesMask :: Integer } deriving (Eq, Show)
 
-allValsFromMask :: Integer -> [Integer]
-allValsFromMask 0 = [0]
-allValsFromMask x = do
-    y <- allValsFromMask (x .&. (x-1))
-    [y, y .|. (x .&. (-x))]
+combineBits :: [Integer] -> [Integer]
+combineBits = foldM f 0
+    where f a x = [a, a .|. x]
 
+orBits :: [Integer] -> Integer
+orBits = foldl (.|.) 0
 
 patternsFromProblem :: Problem -> [Pattern]
 patternsFromProblem p = concatMap dotSquare [(r, c) | r <- [0..rn+1], c <- [0..cn+1]]
@@ -72,28 +72,24 @@ patternsFromProblem p = concatMap dotSquare [(r, c) | r <- [0..rn+1], c <- [0..c
                                    else dot i
           square (_, Unconstrained) = []
           square (i, Exactly n) = [ Pattern { pMask = mask
-                                            , pVal  = filter ((==n) . popCount) $ allValsFromMask mask
+                                            , pVal  = filter ((==n) . popCount) allVals
                                             } ]
               where b = bitnoForSquare i
                     b1 = b + bitsPerRow
-                    mask = bit (b+1) .|. bit (b+2) .|. bit (b+4) .|. bit (b1+2)
+                    bits = [bit (b+1), bit (b+2), bit (b+4), bit (b1+2)]
+                    mask = orBits bits
+                    allVals = combineBits bits
           dot i@(r, c) = [ Pattern { pMask = mask
-                                   , pVal  =  0 : twoLines
+                                   , pVal  =  0 : filter ((==5) . popCount) allVals -- 2 lines = 5 bits
                                    } ]
               where b = bitnoForSquare i
-                    lineUp = if r > 0 then bit (b - bitsPerRow + 1) else 0 
-                    lineRight = if c <= cn then bit (b + 2) else 0 
-                    lineDown = if r <= rn then bit (b + 1) else 0 
-                    lineLeft = if c > 0 then bit (b - 1) else 0 
-                    mask = lineUp .|. lineRight .|. lineDown .|. lineLeft
-                    twoLines = map
-                      (
-                        (\x -> x .|. bit b)
-                      . (\x -> if x .&. lineUp /= 0 then x .|. bit (bitnoForSquare (r-1, c)) else x)
-                      . (\x -> if x .&. lineRight /= 0 then x .|. bit (bitnoForSquare (r, c+1)) else x)
-                      . (\x -> if x .&. lineDown /= 0 then x .|. bit (bitnoForSquare (r+1, c)) else x)
-                      . (\x -> if x .&. lineLeft /= 0 then x .|. bit (bitnoForSquare (r, c-1)) else x)
-                      ) $ filter ((==2) . popCount) $ allValsFromMask mask
+                    lineUp = if r > 0 then [bit (b - bitsPerRow + 1 ) .|. bit b .|. bit (bitnoForSquare (r-1, c))] else [] 
+                    lineRight = if c <= cn then [bit (b + 2) .|. bit b .|. bit (bitnoForSquare (r, c+1))] else [] 
+                    lineDown = if r <= rn then [bit (b + 1) .|. bit b .|. bit (bitnoForSquare (r+1, c))] else [] 
+                    lineLeft = if c > 0 then [bit (b - 1) .|. bit b .|. bit (bitnoForSquare (r, c-1))] else [] 
+                    bits = concat [lineUp, lineRight, lineDown, lineLeft]
+                    mask = orBits bits
+                    allVals = combineBits bits
 
 stateFromProblem :: Problem -> State
 stateFromProblem p = State { sMask = 0, sVal = 0, loops = [], dotsMask = dm, linesMask = lm }

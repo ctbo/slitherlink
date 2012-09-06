@@ -183,7 +183,9 @@ solve problem = do
   solve' (startingPositions state) state
 
 solve' :: [(Int, Int)] -> State -> [State]
-solve' is state = concatMap (\i -> solve'' i i state) is
+solve' [] _ = []
+solve' (i:is) state = solve'' i i state ++ solve' is state'
+       where state' = state // [(i, Space [FourLines False False False False])]
 
 solve'' :: (Int, Int) -> (Int, Int) -> State -> [State]
 solve'' goal pos state = concatMap f directions4

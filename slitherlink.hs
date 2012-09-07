@@ -232,16 +232,27 @@ showSolution problem state = (unlines $ map oneLine [r0 .. rn])
         showConstraint i = show $ problem!i
 
 main :: IO ()
-main = getArgs >>= f >>= g where
-    f [filename] = readFile filename
-    f []         = return sampleProblemString
-    f _          = error "Too many arguments."
-    g pString = case readProblem pString of
-      Left e -> putStrLn e
-      Right p -> do
-            let solutions = solve p
-            putStr $ concatMap (showSolution p) $ take 2 solutions
-            putStrLn $ "Total number of solutions: " ++ show (length solutions)
+main = do
+     args <- getArgs
+     case args of
+          [filename, number] -> do
+                     s <- readFile filename
+                     work s (read number)
+          [filename] -> do
+                     s <- readFile filename
+                     work s 2
+          [] -> work sampleProblemString 2
+          _  -> error "Too many arguments."
+  where work s n = case readProblem s of
+             Left e -> putStrLn e
+             Right p -> do
+                   putStrLn $ "Showing " ++ (if n == 0 then "all" else show n) ++ " solutions."
+                   let solutions = solve p
+                   let display
+                         | n == 0 = solutions
+                         | otherwise = take n solutions
+                   putStr $ concatMap (showSolution p) display
+                   putStrLn $ "Total number of solutions: " ++ show (length solutions)
 
 
 -- stuff for interactive experiments

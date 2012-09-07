@@ -184,17 +184,26 @@ solve problem = do
 
 solve' :: [(Int, Int)] -> State -> [State]
 solve' [] _ = []
-solve' (i:is) state = solve'' i i state ++ solve' is state'
+solve' (i:is) state = solve'' i state ++ solve' is state'
        where state' = state // [(i, Space [FourLines False False False False])]
 
-solve'' :: (Int, Int) -> (Int, Int) -> State -> [State]
-solve'' goal pos state = concatMap f directions4
-            where f dir = do
-                      newState <- move pos dir state
-                      let newPos = pos .+ dir .+ dir
-                      if newPos == goal
-                        then zeroRemainingLines newState
-                        else solve'' goal newPos newState
+solve'' :: (Int, Int) -> State -> [State]
+solve'' start state = maybeList $ find (not.null) $ map f directions4
+    where f dir = do
+                    newState <- move start dir state
+                    let newPos = start .+ dir .+ dir
+                    solve''' start newPos newState
+          maybeList (Just x) = x
+          maybeList Nothing  = []
+
+solve''' :: (Int, Int) -> (Int, Int) -> State -> [State]
+solve''' goal pos state = concatMap f directions4
+    where f dir = do
+                    newState <- move pos dir state
+                    let newPos = pos .+ dir .+ dir
+                    if newPos == goal
+                      then zeroRemainingLines newState
+                      else solve''' goal newPos newState
 
 startingPositions :: State -> [(Int, Int)]
 startingPositions state = if null s then evenIndices else [head s]

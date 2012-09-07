@@ -178,26 +178,34 @@ solve problem = do
 
 solve' :: [(Int, Int)] -> State -> [State]
 solve' [] _ = []
-solve' (i:is) state = solve'' i i state ++ solve' is state'
+solve' (i:is) state = solve'' i state ++ solve' is state'
     where state' = state // [(i, CellState {slList = sll', visited = v})]
           CellState sll v = state!i
           sll' = filter ((==0).countDotLines) sll
 
-solve'' :: (Int, Int) -> (Int, Int) -> State -> [State]
-solve'' goal pos state = concatMap f directions4
-    where f (dir, line) = do
-            let pos' = pos .+ dir
-            state' <- visit pos' state
-            let sls = slList $ state'!pos
-            let sls' = filter line sls
-            when (null sls') []
-            state'' <- if sls' == sls 
-                         then [state']
-                         else narrow (Set.fromList $ map (pos .+) directions6) 
-                                   $ state' // [(pos, CellState sls' (visited (state'!pos)))]
-            if (pos' == goal)
-               then zeroRemainingLines state''
-               else solve'' goal pos' state''
+
+solve'' :: (Int, Int) -> State -> [State]
+solve'' start state = maybeList $ find (not.null) $ map (step start start state) directions4
+    where maybeList (Just x) = x
+          maybeList Nothing  = []
+
+solve''' :: (Int, Int) -> (Int, Int) -> State -> [State]
+solve''' goal pos state = concatMap (step goal pos state) directions4
+
+step :: (Int, Int) -> (Int, Int) -> State -> ((Int, Int), SixLines -> Bool) -> [State]
+step goal pos state (dir, line) = do
+     let pos' = pos .+ dir
+     state' <- visit pos' state
+     let sls = slList $ state'!pos
+     let sls' = filter line sls
+     when (null sls') []
+     state'' <- if sls' == sls 
+                  then [state']
+                  else narrow (Set.fromList $ map (pos .+) directions6) 
+                            $ state' // [(pos, CellState sls' (visited (state'!pos)))]
+     if (pos' == goal)
+        then zeroRemainingLines state''
+        else solve''' goal pos' state''
 
 zeroRemainingLines :: State -> [State]
 zeroRemainingLines state = foldM zero state (indices state) >>= narrowAll
@@ -230,16 +238,27 @@ showSolution problem state = concat $ map twoLines [r0 .. rn]
         unwrap r c = head $ slList $ state!(r, c)
 
 main :: IO ()
-main = getArgs >>= f >>= g where
-    f [filename] = readFile filename
-    f []         = return sampleProblemString
-    f _          = error "Too many arguments."
-    g pString = case readProblem pString of
-      Left e -> putStrLn e
-      Right p -> do
-            let solutions = solve p
-            putStr $ concatMap (showSolution p) $ take 2 solutions
-            putStrLn $ "Total number of solutions: " ++ show (length solutions)
+main = do
+     args <- getArgs
+     case args of
+          [filename, number] -> do
+                     s <- readFile filename
+                     work s (read number)
+          [filename] -> do
+                     s <- readFile filename
+                     work s 2
+          [] -> work sampleProblemString 2
+          _  -> error "Too many arguments."
+  where work s n = case readProblem s of
+             Left e -> putStrLn e
+             Right p -> do
+                   putStrLn $ "Showing " ++ (if n == 0 then "all" else show n) ++ " solutions."
+                   let solutions = solve p
+                   let display
+                         | n == 0 = solutions
+                         | otherwise = take n solutions
+                   putStr $ concatMap (showSolution p) display
+                   putStrLn $ "Total number of solutions: " ++ show (length solutions)
 
 -- stuff for interactive experiments
 

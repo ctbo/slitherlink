@@ -6,7 +6,6 @@
 import Data.Array.IArray
 import Control.Monad
 import Control.Monad.Instances()
-import Data.Maybe (isJust)
 import Data.List (find)
 import System.Environment
 import qualified Data.Set as Set
@@ -126,8 +125,8 @@ directions6 = [ (0, 1)
 (.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
 (a, b) .+ (c, d) = (a+c, b+d)
 
-narrow :: Set.Set (Int, Int) -> State -> Maybe State
-narrow seed state = if Set.null seed then Just state else
+narrow :: Set.Set (Int, Int) -> State -> [State]
+narrow seed state = if Set.null seed then [state] else
     let (i@(r,c), seed') = Set.deleteFindMin seed in
       if not (inRange (bounds state) i) 
         then narrow seed' state 
@@ -141,7 +140,7 @@ narrow seed state = if Set.null seed then Just state else
                    $ filter (match state (r+1, c+1) [(up, right), (totheleft, bottom)])    
                    sls
           if null sls'
-             then Nothing
+             then []
              else if sls' == sls
                      then narrow seed' state
                      else let newSeeds = Set.fromList $ map (i .+) directions6
@@ -154,11 +153,8 @@ match state i fps thiscell = (not (inRange (bounds state) i)) || any ok otherlis
           ok othercell = all pairmatch fps
               where pairmatch (otherf, thisf) = thisf thiscell == otherf othercell
 
-narrowAll :: State -> Maybe State
+narrowAll :: State -> [State]
 narrowAll state = narrow (Set.fromList (indices state)) state
-
-untilJust :: (b -> Maybe a) -> [b] -> Maybe a
-untilJust f = join . find isJust . map f
 
 directions4 :: [((Int, Int), SixLines -> Bool)]
 directions4 = [ ((0, 1), top)
@@ -167,47 +163,47 @@ directions4 = [ ((0, 1), top)
              , ((-1,0), up)
              ]
 
-visit :: (Int, Int) -> State -> Maybe State
+visit :: (Int, Int) -> State -> [State]
 visit i state = if inRange (bounds state) i && not (visited (cell))
-                   then Just (state // [(i, CellState { slList = slList cell
-                                                     , visited = True 
-                                                     })])
-                   else Nothing
+                   then [state // [(i, CellState { slList = slList cell
+                                                 , visited = True 
+                                                 })]]
+                   else []
     where cell = state!i
 
-solve :: Problem -> Maybe State
+solve :: Problem -> [State]
 solve problem = do
   state <- narrowAll $ stateFromProblem problem
   solve' (startingPositions state) state
 
-solve' :: [(Int, Int)] -> State -> Maybe State
-solve' is state = untilJust (\i -> solve'' i i state) is
+solve' :: [(Int, Int)] -> State -> [State]
+solve' is state = concatMap (\i -> solve'' i i state) is
 
-solve'' :: (Int, Int) -> (Int, Int) -> State -> Maybe State
-solve'' goal pos state = untilJust f directions4
+solve'' :: (Int, Int) -> (Int, Int) -> State -> [State]
+solve'' goal pos state = concatMap f directions4
     where f (dir, line) = do
             let pos' = pos .+ dir
             state' <- visit pos' state
             let sls = slList $ state'!pos
             let sls' = filter line sls
-            when (null sls') Nothing
+            when (null sls') []
             state'' <- if sls' == sls 
-                         then Just state'
+                         then [state']
                          else narrow (Set.fromList $ map (pos .+) directions6) 
                                    $ state' // [(pos, CellState sls' (visited (state'!pos)))]
             if (pos' == goal)
                then zeroRemainingLines state''
                else solve'' goal pos' state''
 
-zeroRemainingLines :: State -> Maybe State
+zeroRemainingLines :: State -> [State]
 zeroRemainingLines state = foldM zero state (indices state) >>= narrowAll
     where zero s i = if visited (s!i)
-                        then Just s
+                        then [s]
                         else do
                           let sls = slList (s!i)
                           let sls' = filter ((==0).countDotLines) sls
-                          when (null sls') Nothing
-                          Just (s // [(i, CellState sls' False)])
+                          when (null sls') []
+                          [s // [(i, CellState sls' False)]]
 
 startingPositions :: State -> [(Int, Int)]
 startingPositions state = if null s then indices state else [head s]
@@ -215,8 +211,8 @@ startingPositions state = if null s then indices state else [head s]
         lineAtDot i = let (CellState sls _) = state!i
                       in all ((==2) . countDotLines) sls
 
-showSolution :: Problem -> Maybe State -> String
-showSolution problem (Just state) = concat $ map twoLines [r0 .. rn]
+showSolution :: Problem -> State -> String
+showSolution problem state = concat $ map twoLines [r0 .. rn]
   where ((r0, c0), (rn, cn)) = bounds state
         twoLines r = unlines [oddLine r, evenLine r]
         oddLine r = concat $ map (oddPair r) [c0 .. cn]
@@ -228,7 +224,6 @@ showSolution problem (Just state) = concat $ map twoLines [r0 .. rn]
         vLine r c = if left (unwrap r c) then "|" else " "
         square r c = if inRange (bounds problem) (r, c) then show $ problem!(r, c) else " "
         unwrap r c = head $ slList $ state!(r, c)
-showSolution _ _ = "No solution.\n"
 
 main :: IO ()
 main = getArgs >>= f >>= g where
@@ -237,7 +232,10 @@ main = getArgs >>= f >>= g where
     f _          = error "Too many arguments."
     g pString = case readProblem pString of
       Left e -> putStrLn e
-      Right p -> putStrLn $ showSolution p $ solve p
+      Right p -> do
+            let solutions = solve p
+            putStr $ concatMap (showSolution p) $ take 2 solutions
+            putStrLn $ "Total number of solutions: " ++ show (length solutions)
 
 -- stuff for interactive experiments
 

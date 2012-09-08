@@ -107,6 +107,15 @@ patternsFromProblem p = concatMap dotSquare [(r, c) | r <- [0..rn+1], c <- [0..c
                       . (\x -> if x .&. lineLeft /= 0 then x .|. bit (bitnoForSquare (r, c-1)) else x)
                       ) $ filter ((==2) . popCount) $ allValsFromMask mask
 
+joinPatterns :: Pattern -> Pattern -> Pattern
+joinPatterns (Pattern maskA valA) (Pattern maskB valB) =
+    Pattern (maskA .|. maskB) [ a .|. b | a <- valA, b <- valB 
+                                        , let m = maskA .&. maskB
+                                        , a .&. m == b .&. m ]
+
+foldPatterns :: [Pattern] -> [Pattern]
+foldPatterns ps = zipWith joinPatterns ps (tail ps)
+
 stateFromProblem :: Problem -> State
 stateFromProblem p = State { sMask = 0, sVal = 0, loops = [], dotsMask = dm, linesMask = lm }
     where ((0, 0), (rn, cn)) = bounds p

@@ -6,7 +6,6 @@
 import Data.Array.IArray
 import Control.Monad
 import Control.Monad.Instances()
-import Data.List (find)
 import System.Environment
 import qualified Data.Map as Map
 
@@ -47,50 +46,61 @@ readProblem s = do
 
 type Index = (Int, Int)
 type Segments = Map.Map Index Index
+data LoopStatus = Unfinished Segments | OneLoop | Invalid deriving (Show, Eq)
 
-addSegment :: Index -> Index -> Segments -> Maybe Segments
-addSegment i j l = 
+addSegment :: Index -> Index -> LoopStatus -> LoopStatus
+addSegment i j (Unfinished l) = 
     case (Map.lookup i l,  Map.lookup j l) of
-      (Nothing, Nothing) -> Just $ Map.insert i  j  $ Map.insert j  i  l
-      (Just i', Nothing) -> Just $ Map.insert i' j  $ Map.insert j  i' $ Map.delete i l
-      (Nothing, Just j') -> Just $ Map.insert i  j' $ Map.insert j' i  $ Map.delete j l
+      (Nothing, Nothing) -> Unfinished $ Map.insert i  j  $ Map.insert j  i  l
+      (Just i', Nothing) -> Unfinished $ Map.insert i' j  $ Map.insert j  i' $ Map.delete i l
+      (Nothing, Just j') -> Unfinished $ Map.insert i  j' $ Map.insert j' i  $ Map.delete j l
       (Just i', Just j') -> if i' == j
                                then if Map.null $ Map.delete i $ Map.delete j l
-                                       then Just Map.empty -- the only loop has been closed
-                                       else Nothing -- a loop has closed but there is more
-                               else Just $ Map.insert i' j' $ Map.insert j' i'
-                                         $ Map.delete i     $ Map.delete j     l
+                                       then OneLoop -- the only loop has been closed
+                                       else Invalid -- a loop has closed but there is more
+                               else Unfinished $ Map.insert i' j' $ Map.insert j' i'
+                                               $ Map.delete i     $ Map.delete j     l
+addSegment _ _ _ = Invalid
 
 data TwoLines = TwoLines { lRight :: Bool, lDown :: Bool } deriving Show
 data State = State { sProblem  :: Problem
                    , sLines    :: Array Index TwoLines
-                   , sSegments :: Segments 
+                   , sLoops    :: LoopStatus 
                    }
 
 stateFromProblem :: Problem -> State
-stateFromProblem p = State p (array ((0, 0), (rn+1, cn+1)) []) Map.empty
+stateFromProblem p = State p (array ((0, 0), (rn+1, cn+1)) []) (Unfinished Map.empty)
     where ((0, 0), (rn, cn)) = bounds p
 
-step :: Index -> State -> [State]
-step i@(r, c) (State problem lines segments) =
+step :: State -> Index -> [State]
+step (State problem lines loops) i@(r, c)  =
      ( if aboveOK 0 && leftOK 0 && ulLines `elem` [0, 2]
-          then [State problem (lines//[(i, TwoLines False False)]) segments]
+          then [State problem (lines//[(i, TwoLines False False)]) loops]
           else []
      )
      ++
      ( if c < cn && aboveOK 1 && leftOK 0 && ulLines == 1
-          then [State problem (lines//[(i, TwoLines {lRight=True, lDown=False})]) segments] -- FIXME loop detection
+          then let newLoops = addSegment (r, c) (r, c+1) loops
+               in if newLoops /= Invalid
+                  then [State problem (lines//[(i, TwoLines {lRight=True, lDown=False})]) newLoops]
+                  else []
           else []
      )
      ++
      ( if r < rn && aboveOK 0 && leftOK 1 && ulLines == 1
-          then [State problem (lines//[(i, TwoLines {lRight=False, lDown=True})]) segments] -- FIXME loop detection
+          then let newLoops = addSegment (r, c) (r+1, c) loops
+               in if newLoops /= Invalid
+                  then [State problem (lines//[(i, TwoLines {lRight=False, lDown=True})]) newLoops]
+                  else []
           else []
      )
      ++
      (
        if c < cn && r < rn && aboveOK 1 && leftOK 1 && ulLines == 0
-          then [State problem (lines//[(i, TwoLines True True)]) segments] -- FIXME loop detection
+          then let newLoops = addSegment (r+1, c) (r, c+1) loops
+               in if newLoops /= Invalid
+                  then [State problem (lines//[(i, TwoLines True True)]) newLoops]
+                  else []
           else []
      )
      where ((0, 0), (rn, cn)) = bounds lines
@@ -101,13 +111,26 @@ step i@(r, c) (State problem lines segments) =
            ulLines = count [downLine (r-1, c), rightLine (r, c-1)]
            aboveConstraint = constraint (r-1, c)
            leftConstraint = constraint (r, c-1)
-           rightLine i = inRange (bounds lines) i && lRight (lines!i)
-           downLine  i = inRange (bounds lines) i && lDown  (lines!i)
-           constraint i = if inRange (bounds problem) i then problem!i else Unconstrained
+           rightLine j = inRange (bounds lines) j && lRight (lines!j)
+           downLine  j = inRange (bounds lines) j && lDown  (lines!j)
+           constraint j = if inRange (bounds problem) j then problem!j else Unconstrained
            count = sum . map (\b -> if b then 1 else 0)
 
+solve :: Problem -> [State]
+solve problem = foldM step start grid
+    where start = stateFromProblem problem
+          grid = indices (sLines start)
 
-{-
+showSolution :: State -> String
+showSolution (State problem lines _) = concatMap twoLines [0..rn]
+    where ((0, 0), (rn, cn)) = bounds lines
+          twoLines r = evenLine r ++ "\n" ++ oddLine r ++ "\n"
+          evenLine r = concatMap (evenCell r) [0..cn]
+          evenCell r c = " " ++ (if lRight (lines!(r, c)) then "-" else " ")
+          oddLine r = concatMap (oddCell r) [0..cn]
+          oddCell r c = (if lDown (lines!(r, c)) then "|" else " ") ++ constraint (r, c)
+          constraint i = if inRange (bounds problem) i then show (problem!i) else " "
+
 main :: IO ()
 main = do
      args <- getArgs
@@ -128,11 +151,8 @@ main = do
                    let display
                          | n == 0 = solutions
                          | otherwise = take n solutions
-                   putStr $ concatMap (showSolution p) display
+                   putStr $ concatMap showSolution display
                    putStrLn $ "Total number of solutions: " ++ show (length solutions)
--}
-
--- stuff for interactive experiments
 
 sampleProblemString :: String
 sampleProblemString = unlines [".3.112.2.."
@@ -146,6 +166,9 @@ sampleProblemString = unlines [".3.112.2.."
                               ,"2220.3..3."
                               ,"..3.122.2."
                               ]
+
+
+-- stuff for interactive experiments
 
 sampleProblem :: Problem
 sampleProblem = case readProblem sampleProblemString of 

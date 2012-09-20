@@ -16,6 +16,10 @@ instance Show Constraint where
     show Unconstrained = "."
     show (Exactly x) = show x
 
+match :: Constraint -> Int -> Bool
+match Unconstrained _ = True
+match (Exactly x)   y = x == y 
+
 readConstraint :: Char -> Either String Constraint
 readConstraint '.' = Right Unconstrained
 readConstraint '0' = Right $ Exactly 0
@@ -56,6 +60,52 @@ addSegment i j l =
                                        else Nothing -- a loop has closed but there is more
                                else Just $ Map.insert i' j' $ Map.insert j' i'
                                          $ Map.delete i     $ Map.delete j     l
+
+data TwoLines = TwoLines { lRight :: Bool, lDown :: Bool } deriving Show
+data State = State { sProblem  :: Problem
+                   , sLines    :: Array Index TwoLines
+                   , sSegments :: Segments 
+                   }
+
+stateFromProblem :: Problem -> State
+stateFromProblem p = State p (array ((0, 0), (rn+1, cn+1)) []) Map.empty
+    where ((0, 0), (rn, cn)) = bounds p
+
+step :: Index -> State -> [State]
+step i@(r, c) (State problem lines segments) =
+     ( if aboveOK 0 && leftOK 0 && ulLines `elem` [0, 2]
+          then [State problem (lines//[(i, TwoLines False False)]) segments]
+          else []
+     )
+     ++
+     ( if c < cn && aboveOK 1 && leftOK 0 && ulLines == 1
+          then [State problem (lines//[(i, TwoLines {lRight=True, lDown=False})]) segments] -- FIXME loop detection
+          else []
+     )
+     ++
+     ( if r < rn && aboveOK 0 && leftOK 1 && ulLines == 1
+          then [State problem (lines//[(i, TwoLines {lRight=False, lDown=True})]) segments] -- FIXME loop detection
+          else []
+     )
+     ++
+     (
+       if c < cn && r < rn && aboveOK 1 && leftOK 1 && ulLines == 0
+          then [State problem (lines//[(i, TwoLines True True)]) segments] -- FIXME loop detection
+          else []
+     )
+     where ((0, 0), (rn, cn)) = bounds lines
+           aboveOK b = match aboveConstraint (aboveLines + b)
+           leftOK b = match leftConstraint (leftLines+b) || match leftConstraint (leftLines+b+1)
+           aboveLines = count [rightLine (r-1, c), downLine (r-1, c), downLine (r-1, c+1)]
+           leftLines = count [rightLine (r, c-1), downLine (r, c-1)]
+           ulLines = count [downLine (r-1, c), rightLine (r, c-1)]
+           aboveConstraint = constraint (r-1, c)
+           leftConstraint = constraint (r, c-1)
+           rightLine i = inRange (bounds lines) i && lRight (lines!i)
+           downLine  i = inRange (bounds lines) i && lDown  (lines!i)
+           constraint i = if inRange (bounds problem) i then problem!i else Unconstrained
+           count = sum . map (\b -> if b then 1 else 0)
+
 
 {-
 main :: IO ()

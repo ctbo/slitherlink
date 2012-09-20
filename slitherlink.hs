@@ -47,9 +47,9 @@ type Segments = Map.Map Index Index
 addSegment :: Index -> Index -> Segments -> Maybe Segments
 addSegment i j l = 
     case (Map.lookup i l,  Map.lookup j l) of
-      (Nothing, Nothing) -> Just $ Map.insert i  j  $ Map.insert j  i  $ Map.delete j l
+      (Nothing, Nothing) -> Just $ Map.insert i  j  $ Map.insert j  i  l
       (Just i', Nothing) -> Just $ Map.insert i' j  $ Map.insert j  i' $ Map.delete i l
-      (Nothing, Just j') -> Just $ Map.insert i  j' $ Map.insert j' i  l
+      (Nothing, Just j') -> Just $ Map.insert i  j' $ Map.insert j' i  $ Map.delete j l
       (Just i', Just j') -> if i' == j
                                then if Map.null $ Map.delete i $ Map.delete j l
                                        then Just Map.empty -- the only loop has been closed

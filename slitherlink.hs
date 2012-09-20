@@ -51,7 +51,9 @@ addSegment i j l =
       (Just i', Nothing) -> Just $ Map.insert i' j  $ Map.insert j  i' $ Map.delete i l
       (Nothing, Just j') -> Just $ Map.insert i  j' $ Map.insert j' i  l
       (Just i', Just j') -> if i' == j
-                               then Nothing
+                               then if Map.null $ Map.delete i $ Map.delete j l
+                                       then Just Map.empty -- the only loop has been closed
+                                       else Nothing -- a loop has closed but there is more
                                else Just $ Map.insert i' j' $ Map.insert j' i'
                                          $ Map.delete i     $ Map.delete j     l
 

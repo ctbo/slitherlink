@@ -6,7 +6,7 @@
 import Data.Array.IArray
 import Control.Monad
 import Control.Monad.Instances()
-import Data.Maybe (isJust)
+import Data.Maybe (fromMaybe)
 import Data.List (find)
 import System.Environment
 import qualified Data.Set as Set
@@ -188,13 +188,11 @@ solve' (i:is) state = solve'' i state ++ solve' is state'
        where state' = state // [(i, Space [FourLines False False False False])]
 
 solve'' :: (Int, Int) -> State -> [State]
-solve'' start state = maybeList $ find (not.null) $ map f directions4
+solve'' start state = fromMaybe [] $ find (not.null) $ map f directions4
     where f dir = do
                     newState <- move start dir state
                     let newPos = start .+ dir .+ dir
                     solve''' start newPos newState
-          maybeList (Just x) = x
-          maybeList Nothing  = []
 
 solve''' :: (Int, Int) -> (Int, Int) -> State -> [State]
 solve''' goal pos state = concatMap f directions4

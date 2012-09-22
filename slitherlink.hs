@@ -229,13 +229,14 @@ showSolution problem state = concat $ map twoLines [r0 .. rn]
         twoLines r = unlines [oddLine r, evenLine r]
         oddLine r = concat $ map (oddPair r) [c0 .. cn]
         oddPair r c = dot r c ++ hLine r c
-        dot r c = if countDotLines (unwrap r c) == 0 then " " else "+"
-        hLine r c = if top (unwrap r c) then "-" else " "
+        dot r c = yesNoMaybe ((==0).countDotLines) r c " " "+" "?"
+        hLine r c = yesNoMaybe top r c "-" " " "?"
         evenLine r = concat $ map (evenPair r) [c0 .. cn]
         evenPair r c = vLine r c ++ square r c
-        vLine r c = if left (unwrap r c) then "|" else " "
+        vLine r c = yesNoMaybe left r c "|" " " "?"
         square r c = if inRange (bounds problem) (r, c) then show $ problem!(r, c) else " "
-        unwrap r c = head $ slList $ state!(r, c)
+        yesNoMaybe f r c y n m = let sll = slList (state!(r, c)) 
+                                 in if all f sll then y else if all (not.f) sll then n else m
 
 main :: IO ()
 main = do

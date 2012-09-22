@@ -190,15 +190,15 @@ solve' (i:is) state = solve'' i state ++ solve' is state'
 
 
 solve'' :: Index -> State -> [State]
-solve'' start state = maybeList $ find (not.null) $ map (step start start state) directions4
+solve'' start state = maybeList $ find (not.null) $ map (step 1 start start state) directions4
     where maybeList (Just x) = x
           maybeList Nothing  = []
 
-solve''' :: Index -> Index -> State -> [State]
-solve''' goal pos state = concatMap (step goal pos state) directions4
+solve''' :: Int -> Index -> Index -> State -> [State]
+solve''' depth goal pos state = concatMap (step depth goal pos state) directions4
 
-step :: Index -> Index -> State -> (Index, SixLines -> Bool) -> [State]
-step goal pos state (dir, line) = do
+step :: Int -> Index -> Index -> State -> (Index, SixLines -> Bool) -> [State]
+step depth goal pos state (dir, line) = do
      let pos' = pos .+ dir
      state' <- visit pos' state
      let sls = slList $ state'!pos
@@ -210,7 +210,7 @@ step goal pos state (dir, line) = do
                             $ state' // [(pos, CellState sls' (visited (state'!pos)) (constraint (state'!pos)))]
      if (pos' == goal)
         then zeroRemainingLines state''
-        else solve''' goal pos' state''
+        else solve''' (depth+1) goal pos' state''
 
 zeroRemainingLines :: State -> [State]
 zeroRemainingLines state = foldM zero state (indices state) >>= narrowAll

@@ -98,17 +98,18 @@ slListLeft =  [SixLines { top = False
 
 data CellState = CellState { slList :: [SixLines]
                            , visited :: Bool
+                           , constraint :: Constraint
                            }
 type State =  Array (Int, Int) CellState
 
 stateFromProblem :: Problem -> State
 stateFromProblem p = array ((-1, -1), (rn+1, cn+1)) cells
     where ((0, 0), (rn, cn)) = bounds p
-          cells = [((r, c), CellState (xform (p!(r, c))) False) | r <- [0..rn], c <- [0..cn]]
-               ++ [((-1, c), CellState slListTop False) | c <- [0 .. cn+1]]
-               ++ [((r, cn+1), CellState slListRight False) | r <- [0 .. rn+1]]
-               ++ [((rn+1, c), CellState slListBottom False) | c <- [0 .. cn]]
-               ++ [((r, -1), CellState slListLeft False) | r <- [-1 .. rn+1]]
+          cells = [((r, c), CellState (xform n) False n) | r <- [0..rn], c <- [0..cn], let n = p!(r, c)]
+               ++ [((-1, c), CellState slListTop False Unconstrained) | c <- [0 .. cn+1]]
+               ++ [((r, cn+1), CellState slListRight False Unconstrained) | r <- [0 .. rn+1]]
+               ++ [((rn+1, c), CellState slListBottom False Unconstrained) | c <- [0 .. cn]]
+               ++ [((r, -1), CellState slListLeft False Unconstrained) | r <- [-1 .. rn+1]]
           xform Unconstrained = slListAll
           xform (Exactly n) = filter ((== n) . countBoxLines) slListAll
 
@@ -145,7 +146,9 @@ narrow seed state = if Set.null seed then [state] else
                      then narrow seed' state
                      else let newSeeds = Set.fromList $ map (i .+) directions6
                           in narrow (Set.union seed' newSeeds) 
-                                    (state // [(i, CellState { slList=sls', visited = visited (state!i) })])
+                                    (state // [(i, CellState { slList=sls'
+                                                             , visited = visited (state!i)
+                                                             , constraint = constraint (state!i) })])
                  
 match :: State -> (Int, Int) -> [(SixLines->Bool, SixLines->Bool)] -> SixLines -> Bool
 match state i fps thiscell = (not (inRange (bounds state) i)) || any ok otherlist
@@ -166,7 +169,8 @@ directions4 = [ ((0, 1), top)
 visit :: (Int, Int) -> State -> [State]
 visit i state = if inRange (bounds state) i && not (visited (cell))
                    then [state // [(i, CellState { slList = slList cell
-                                                 , visited = True 
+                                                 , visited = True
+                                                 , constraint = constraint cell
                                                  })]]
                    else []
     where cell = state!i
@@ -179,8 +183,8 @@ solve problem = do
 solve' :: [(Int, Int)] -> State -> [State]
 solve' [] _ = []
 solve' (i:is) state = solve'' i state ++ solve' is state'
-    where state' = state // [(i, CellState {slList = sll', visited = v})]
-          CellState sll v = state!i
+    where state' = state // [(i, CellState {slList = sll', visited = v, constraint = cstr})]
+          CellState sll v cstr = state!i
           sll' = filter ((==0).countDotLines) sll
 
 
@@ -202,7 +206,7 @@ step goal pos state (dir, line) = do
      state'' <- if sls' == sls 
                   then [state']
                   else narrow (Set.fromList $ map (pos .+) directions6) 
-                            $ state' // [(pos, CellState sls' (visited (state'!pos)))]
+                            $ state' // [(pos, CellState sls' (visited (state'!pos)) (constraint (state'!pos)))]
      if (pos' == goal)
         then zeroRemainingLines state''
         else solve''' goal pos' state''
@@ -215,16 +219,16 @@ zeroRemainingLines state = foldM zero state (indices state) >>= narrowAll
                           let sls = slList (s!i)
                           let sls' = filter ((==0).countDotLines) sls
                           when (null sls') []
-                          [s // [(i, CellState sls' False)]]
+                          [s // [(i, CellState sls' False (constraint (s!i)))]]
 
 startingPositions :: State -> [(Int, Int)]
 startingPositions state = if null s then indices state else [head s]
   where s = filter lineAtDot $ indices state
-        lineAtDot i = let (CellState sls _) = state!i
+        lineAtDot i = let (CellState sls _ _) = state!i
                       in all ((==2) . countDotLines) sls
 
-showSolution :: Problem -> State -> String
-showSolution problem state = concat $ map twoLines [r0 .. rn]
+showState ::State -> String
+showState state = concat $ map twoLines [r0 .. rn]
   where ((r0, c0), (rn, cn)) = bounds state
         twoLines r = unlines [oddLine r, evenLine r]
         oddLine r = concat $ map (oddPair r) [c0 .. cn]
@@ -234,7 +238,7 @@ showSolution problem state = concat $ map twoLines [r0 .. rn]
         evenLine r = concat $ map (evenPair r) [c0 .. cn]
         evenPair r c = vLine r c ++ square r c
         vLine r c = yesNoMaybe left r c "|" " " "?"
-        square r c = if inRange (bounds problem) (r, c) then show $ problem!(r, c) else " "
+        square r c = show (constraint (state!(r, c)))
         yesNoMaybe f r c y n m = let sll = slList (state!(r, c)) 
                                  in if all f sll then y else if all (not.f) sll then n else m
 
@@ -258,7 +262,7 @@ main = do
                    let display
                          | n == 0 = solutions
                          | otherwise = take n solutions
-                   putStr $ concatMap (showSolution p) display
+                   putStr $ concatMap showState display
                    putStrLn $ "Total number of solutions: " ++ show (length solutions)
 
 -- stuff for interactive experiments
@@ -281,15 +285,3 @@ sampleProblem = case readProblem sampleProblemString of
   Right x -> x
   Left _ -> undefined -- can't happen
 
-showState :: State -> String
-showState state = unlines $ map oneLine [r0 .. rn]
-  where ((r0, c0), (rn, cn)) = bounds state
-        oneLine r = concat $ map (oneCell r) [c0 .. cn]
-        oneCell r c = superhex $ length $ slList $ state ! (r, c)
-        superhex x
-          | x > 35 = "*"
-          | otherwise = ["0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" !! x]  
-
-showMaybeState :: Maybe State -> String
-showMaybeState Nothing = "No solution.\n"
-showMaybeState (Just state) = showState state

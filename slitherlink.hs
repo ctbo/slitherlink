@@ -116,18 +116,10 @@ step (State problem lines loops) i@(r, c)  =
            constraint j = if inRange (bounds problem) j then problem!j else Unconstrained
            count = sum . map (\b -> if b then 1 else 0)
 
-evenRow :: Int -> State -> [State]
-evenRow r state@(State _ lines _) =
-    if even $ sum $ map (\c -> if lDown (lines!(r,c)) then 1 else 0 :: Int) [0..cn]
-       then [state]
-       else []
-    where ((0,0), (_, cn)) = bounds lines
-
 solve :: Problem -> [State]
-solve problem = foldM lineStep start [0 .. rn]
+solve problem = foldM step start grid
     where start = stateFromProblem problem
-          ((0, 0), (rn, cn)) = bounds (sLines start)
-          lineStep state r = foldM step state [(r, c) | c <- [0..cn]] >>= evenRow r
+          grid = indices (sLines start)
 
 showSolution :: State -> String
 showSolution (State problem lines _) = concatMap twoLines [0..rn]

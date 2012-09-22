@@ -28,7 +28,8 @@ type ProblemList = [[Constraint]]
 readProblemList ::  String -> Either String ProblemList
 readProblemList = (mapM . mapM) readConstraint . lines
 
-type Problem = Array (Int, Int) Constraint
+type Index = (Int, Int)
+type Problem = Array Index Constraint
 
 readProblem :: String -> Either String Problem
 readProblem s = do
@@ -100,7 +101,7 @@ data CellState = CellState { slList :: [SixLines]
                            , visited :: Bool
                            , constraint :: Constraint
                            }
-type State =  Array (Int, Int) CellState
+type State =  Array Index CellState
 
 stateFromProblem :: Problem -> State
 stateFromProblem p = array ((-1, -1), (rn+1, cn+1)) cells
@@ -126,7 +127,7 @@ directions6 = [ (0, 1)
 (.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
 (a, b) .+ (c, d) = (a+c, b+d)
 
-narrow :: Set.Set (Int, Int) -> State -> [State]
+narrow :: Set.Set Index -> State -> [State]
 narrow seed state = if Set.null seed then [state] else
     let (i@(r,c), seed') = Set.deleteFindMin seed in
       if not (inRange (bounds state) i) 
@@ -150,7 +151,7 @@ narrow seed state = if Set.null seed then [state] else
                                                              , visited = visited (state!i)
                                                              , constraint = constraint (state!i) })])
                  
-match :: State -> (Int, Int) -> [(SixLines->Bool, SixLines->Bool)] -> SixLines -> Bool
+match :: State -> Index -> [(SixLines->Bool, SixLines->Bool)] -> SixLines -> Bool
 match state i fps thiscell = (not (inRange (bounds state) i)) || any ok otherlist
     where otherlist = slList $ state!i
           ok othercell = all pairmatch fps
@@ -166,7 +167,7 @@ directions4 = [ ((0, 1), top)
              , ((-1,0), up)
              ]
 
-visit :: (Int, Int) -> State -> [State]
+visit :: Index -> State -> [State]
 visit i state = if inRange (bounds state) i && not (visited (cell))
                    then [state // [(i, CellState { slList = slList cell
                                                  , visited = True
@@ -180,7 +181,7 @@ solve problem = do
   state <- narrowAll $ stateFromProblem problem
   solve' (startingPositions state) state
 
-solve' :: [(Int, Int)] -> State -> [State]
+solve' :: [Index] -> State -> [State]
 solve' [] _ = []
 solve' (i:is) state = solve'' i state ++ solve' is state'
     where state' = state // [(i, CellState {slList = sll', visited = v, constraint = cstr})]
@@ -188,15 +189,15 @@ solve' (i:is) state = solve'' i state ++ solve' is state'
           sll' = filter ((==0).countDotLines) sll
 
 
-solve'' :: (Int, Int) -> State -> [State]
+solve'' :: Index -> State -> [State]
 solve'' start state = maybeList $ find (not.null) $ map (step start start state) directions4
     where maybeList (Just x) = x
           maybeList Nothing  = []
 
-solve''' :: (Int, Int) -> (Int, Int) -> State -> [State]
+solve''' :: Index -> Index -> State -> [State]
 solve''' goal pos state = concatMap (step goal pos state) directions4
 
-step :: (Int, Int) -> (Int, Int) -> State -> ((Int, Int), SixLines -> Bool) -> [State]
+step :: Index -> Index -> State -> (Index, SixLines -> Bool) -> [State]
 step goal pos state (dir, line) = do
      let pos' = pos .+ dir
      state' <- visit pos' state
@@ -221,7 +222,7 @@ zeroRemainingLines state = foldM zero state (indices state) >>= narrowAll
                           when (null sls') []
                           [s // [(i, CellState sls' False (constraint (s!i)))]]
 
-startingPositions :: State -> [(Int, Int)]
+startingPositions :: State -> [Index]
 startingPositions state = if null s then indices state else [head s]
   where s = filter lineAtDot $ indices state
         lineAtDot i = let (CellState sls _ _) = state!i

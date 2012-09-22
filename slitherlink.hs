@@ -257,7 +257,7 @@ main = do
   where work s n = case readProblem s of
              Left e -> putStrLn e
              Right p -> do
-                   putStrLn $ "Showing " ++ (if n == 0 then "all" else show n) ++ " solutions."
+                   putStrLn $ "Showing " ++ (if n == 0 then "all" else "up to " ++ show n) ++ " solutions."
                    let solutions = solve p
                    let display
                          | n == 0 = solutions

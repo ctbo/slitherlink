@@ -9,6 +9,7 @@ import Control.Monad.Instances()
 import System.Environment
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import Debug.Trace
 
 data Constraint = Unconstrained | Exactly Int deriving (Eq)
 instance Show Constraint where
@@ -182,10 +183,11 @@ narrowAll state = narrow (Set.fromList (indices (sCells state))) state
 solve :: Problem -> [State]
 solve problem = do
     state <- narrowAll $ stateFromProblem problem
-    solve' state
+    solve' 0 state
 
-solve' :: State -> [State]
-solve' state@(State cells loops) =
+solve' :: Int -> State -> [State]
+solve' depth state@(State cells loops) =
+--    (if depth >= 35 then trace (showState state) else id) $
     case loops of
          Pieces p -> if Map.null p
                      then [] -- FIXME: should try setting a line somewhere
@@ -194,7 +196,7 @@ solve' state@(State cells loops) =
          Invalid -> []
     where continueAt i = concatMap fix list
             where (Space list cst) = cells!i
-                  fix ss = narrow neighbors (State (cells // [(i, Space [ss] cst)]) loops) >>= solve'
+                  fix ss = narrow neighbors (State (cells // [(i, Space [ss] cst)]) loops) >>= solve' (depth+1)
                   neighbors = Set.fromList $ map (i .+) directions8
           
 hasLine :: CellState -> Bool

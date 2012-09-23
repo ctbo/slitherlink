@@ -10,6 +10,7 @@ import System.Environment
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Debug.Trace
+import Control.Parallel.Strategies
 
 data Constraint = Unconstrained | Exactly Int deriving (Eq)
 instance Show Constraint where
@@ -194,7 +195,7 @@ solve' depth state@(State cells loops) =
                      else continueAt $ head $ Map.keys p
          OneLoop -> [state]
          Invalid -> []
-    where continueAt i = concatMap fix list
+    where continueAt i = concat $ parMap rseq fix list
             where (Space list cst) = cells!i
                   fix ss = narrow neighbors (State (cells // [(i, Space [ss] cst)]) loops) >>= solve' (depth+1)
                   neighbors = Set.fromList $ map (i .+) directions8

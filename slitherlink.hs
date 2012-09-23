@@ -182,17 +182,21 @@ narrowAll state = narrow (Set.fromList (indices (sCells state))) state
 solve :: Problem -> [State]
 solve problem = do
     state <- narrowAll $ stateFromProblem problem
-    let ((0, 0), (rn, cn)) = bounds (sCells state)
-    let evenGrid = [(r, c) | r <- [0, 2 .. rn], c <- [0, 2 .. cn]]
-    solution <- foldM solve' state evenGrid
-    return solution -- TODO: only allow single loops
+    solve' state
 
-solve' :: State -> Index -> [State]
-solve' (State cells loops) i = concatMap fix list
-    where (Space list cst) = cells!i
-          fix ss = narrow neighbors $ State (cells // [(i, Space [ss] cst)]) loops
-          neighbors = Set.fromList $ map (i .+) directions8
-
+solve' :: State -> [State]
+solve' state@(State cells loops) =
+    case loops of
+         Pieces p -> if Map.null p
+                     then [] -- FIXME: should try setting a line somewhere
+                     else continueAt $ head $ Map.keys p
+         OneLoop -> [state]
+         Invalid -> []
+    where continueAt i = concatMap fix list
+            where (Space list cst) = cells!i
+                  fix ss = narrow neighbors (State (cells // [(i, Space [ss] cst)]) loops) >>= solve'
+                  neighbors = Set.fromList $ map (i .+) directions8
+          
 hasLine :: CellState -> Bool
 hasLine (Space ls _) = not (FourLines False False False False `elem` ls)
 hasLine _            = undefined -- can't happen

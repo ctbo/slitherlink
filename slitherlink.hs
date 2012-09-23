@@ -209,8 +209,9 @@ showSolution problem state = (unlines $ map oneLine [r0 .. rn])
           | otherwise = showLine (isVertical r) $ state ! (r, c)
         isVertical = odd
         showLine vertical s = case s of
-          Line [True] _ -> if vertical then "|" else "-"
-          Line _      _ -> " "
+          Line [True]  _ -> if vertical then "|" else "-"
+          Line [False] _ -> " "
+          Line _       _ -> "?"
           _              -> undefined -- can't happen
         showDot s = if hasLine s then "+" else " "
         showConstraint i = show $ problem!i

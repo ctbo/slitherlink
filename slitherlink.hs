@@ -6,7 +6,6 @@
 import Data.Array.IArray
 import Control.Monad
 import Control.Monad.Instances()
-import Data.List (delete)
 import System.Environment
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -85,8 +84,8 @@ flListXing = filter (zeroOrTwo.countLines) flListAll
           zeroOrTwo 2 = True
           zeroOrTwo _ = False
 
-data CellState = Line [Bool] Bool -- Bool is "visited" flag
-               | Space [FourLines] deriving (Eq, Show)
+data CellState = Line [Bool]
+               | Space [FourLines] (Maybe Constraint) deriving (Eq, Show)
 data State =  State { sCells :: Array Index CellState
                     , sLoops :: LoopStatus }
 
@@ -95,10 +94,10 @@ stateFromProblem p = State (array ((0, 0), (rows, columns)) cells) (Pieces Map.e
   where ((0, 0), (rn, cn)) = bounds p
         rows    = 2*rn + 2
         columns = 2*cn + 2
-        cells = [((r, c), Space flListXing) | r <- [0, 2 .. 2*rn+2], c <- [0, 2 .. 2*cn+2]]
-             ++ [((r, c), Line [False, True] False) | r <- [0, 2 .. 2*rn+2], c <- [1, 3 .. 2*cn+1]]
-             ++ [((r, c), Line [False, True] False) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
-             ++ [((2*r+1, 2*c+1), Space (flListForConstraint (p!(r, c))))| r <- [0 .. rn], c <- [0 .. cn]]
+        cells = [((r, c), Space flListXing Nothing) | r <- [0, 2 .. 2*rn+2], c <- [0, 2 .. 2*cn+2]]
+             ++ [((r, c), Line [False, True]) | r <- [0, 2 .. 2*rn+2], c <- [1, 3 .. 2*cn+1]]
+             ++ [((r, c), Line [False, True]) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
+             ++ [((2*r+1, 2*c+1), Space (flListForConstraint cst) (Just cst))| r <- [0 .. rn], c <- [0 .. cn], let cst=p!(r, c)]
 
 type Direction = (Int, Int)
 directions4 :: [Direction] -- right, down, left, up
@@ -122,7 +121,7 @@ narrow seed state = if Set.null seed then [state] else
     let (i@(r,c), seed') = Set.deleteFindMin seed in
       if not (inRange (bounds (sCells state)) i) then narrow seed' state else
     case (sCells state)!i of
-      Line ls v -> do
+      Line ls -> do
         let ls' = filter (match (r-1, c) state bottom)
                 $ filter (match (r, c+1) state left)
                 $ filter (match (r+1, c) state top)
@@ -138,9 +137,9 @@ narrow seed state = if Set.null seed then [state] else
                                      else addSegment (r, c-1) (r, c+1) (sLoops state)
                                 else sLoops state
                  in if newLoops /= Invalid
-                    then narrow (Set.union seed' newSeeds) (State (sCells state // [(i, Line ls' v)]) newLoops)
+                    then narrow (Set.union seed' newSeeds) (State (sCells state // [(i, Line ls')]) newLoops)
                     else []
-      Space ss -> do
+      Space ss cst -> do
         let ss' = filter ((matchl (r-1, c) state).top)
                 $ filter ((matchl (r, c+1) state).right)
                 $ filter ((matchl (r+1, c) state).bottom)
@@ -155,12 +154,12 @@ narrow seed state = if Set.null seed then [state] else
           else if ss' == ss
             then narrow seed' state
             else let newSeeds = Set.fromList $ map (i .+) directions8
-                 in narrow (Set.union seed' newSeeds) (State (sCells state // [(i, Space ss')]) (sLoops state))
+                 in narrow (Set.union seed' newSeeds) (State (sCells state // [(i, Space ss' cst)]) (sLoops state))
 
 match :: Index -> State -> (FourLines -> Bool) -> Bool -> Bool
 match i (State cells _) f x = (not (inRange (bounds cells) i)) 
                            || check (cells!i)
-    where check (Space xs) = any ((==x).f) xs
+    where check (Space xs _) = any ((==x).f) xs
           check _ = undefined -- can't happen
 
 matchl :: Index -> State -> Bool -> Bool
@@ -168,13 +167,13 @@ matchl i (State cells _) x =
     if inRange (bounds cells) i
        then check (cells!i)
        else x == False -- no lines allowed outside grid
-    where check (Line ls _) = x `elem` ls
+    where check (Line ls) = x `elem` ls
           check _ = undefined -- can't happen
 
 match2 :: Index -> State -> (FourLines -> Bool) -> Bool -> (FourLines -> Bool) -> Bool -> Bool
 match2 i (State cells _) f1 x1 f2 x2 = (not (inRange (bounds cells) i)) 
                                     || check (cells!i)
-    where check (Space xs) = any (\x -> f1 x == x1 && f2 x == x2) xs
+    where check (Space xs _) = any (\x -> f1 x == x1 && f2 x == x2) xs
           check _ = undefined -- can't happen
 
 narrowAll :: State -> [State]
@@ -189,32 +188,32 @@ solve problem = do
     return solution -- TODO: only allow single loops
 
 solve' :: State -> Index -> [State]
-solve' (State cells loops) i = concatMap fix $ possibilities $ cells!i
-    where possibilities (Space list) = list
-          possibilities _            = undefined -- can't happen
-          fix ss = narrow neighbors $ State (cells // [(i, Space [ss])]) loops
+solve' (State cells loops) i = concatMap fix list
+    where (Space list cst) = cells!i
+          fix ss = narrow neighbors $ State (cells // [(i, Space [ss] cst)]) loops
           neighbors = Set.fromList $ map (i .+) directions8
 
 hasLine :: CellState -> Bool
-hasLine (Space ls) = not (FourLines False False False False `elem` ls)
-hasLine _          = undefined -- can't happen
+hasLine (Space ls _) = not (FourLines False False False False `elem` ls)
+hasLine _            = undefined -- can't happen
 
-showSolution :: Problem -> State -> String
-showSolution problem (State cells _) = (unlines $ map oneLine [r0 .. rn])
+showState :: State -> String
+showState (State cells _) = (unlines $ map oneLine [r0 .. rn])
   where ((r0, c0), (rn, cn)) = bounds cells
         oneLine r = concat $ map (oneCell r) [c0 .. cn]
         oneCell r c 
           | even r && even c = showDot $ cells ! (r, c)
-          | odd r && odd c = showConstraint (((r-1) `div` 2), ((c-1) `div` 2))
+          | odd r && odd c = showConstraint $ cells ! (r, c)
           | otherwise = showLine (isVertical r) $ cells ! (r, c)
         isVertical = odd
         showLine vertical s = case s of
-          Line [True]  _ -> if vertical then "|" else "-"
-          Line [False] _ -> " "
-          Line _       _ -> "?"
-          _              -> undefined -- can't happen
+          Line [True]  -> if vertical then "|" else "-"
+          Line [False] -> " "
+          Line _       -> "?"
+          _            -> undefined -- can't happen
         showDot s = if hasLine s then "+" else " "
-        showConstraint i = show $ problem!i
+        showConstraint (Space _ (Just cst)) = show cst
+        showConstraint _             = undefined -- can't happen
 
 main :: IO ()
 main = do
@@ -236,7 +235,7 @@ main = do
                    let display
                          | n == 0 = solutions
                          | otherwise = take n solutions
-                   putStr $ concatMap (showSolution p) display
+                   putStr $ concatMap showState display
                    putStrLn $ "Total number of solutions: " ++ show (length solutions)
 
 sampleProblemString :: String

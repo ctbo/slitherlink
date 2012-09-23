@@ -55,7 +55,7 @@ addSegment i j (Pieces l) =
                                        then OneLoop -- the only loop has been closed
                                        else Invalid -- a loop has closed but there is more
                                else Pieces $ Map.insert i' j' $ Map.insert j' i'
-                                               $ Map.delete i     $ Map.delete j     l
+                                           $ Map.delete i     $ Map.delete j     l
 addSegment _ _ _ = Invalid
 
 data FourLines = FourLines { top :: Bool
@@ -70,10 +70,10 @@ countLines x = count top + count right + count bottom + count left
 
 flListAll :: [FourLines]
 flListAll = [FourLines t r b l | t <- [False, True]
-                                      , r <- [False, True]
-                                      , b <- [False, True]
-                                      , l <- [False, True]
-                                      ]
+                               , r <- [False, True]
+                               , b <- [False, True]
+                               , l <- [False, True]
+            ]
 
 flListForConstraint :: Constraint -> [FourLines]
 flListForConstraint Unconstrained = flListAll
@@ -103,10 +103,10 @@ stateFromProblem p = State (array ((0, 0), (rows, columns)) cells) (Pieces Map.e
 type Direction = (Int, Int)
 directions4 :: [Direction] -- right, down, left, up
 directions4 = [ (0, 1)
-             , (1, 0)
-             , (0,-1)
-             , (-1,0)
-             ]
+              , (1, 0)
+              , (0,-1)
+              , (-1,0)
+              ]
 directions8 :: [Direction] -- right down, down left, left up, up right
 directions8 = directions4 ++ [ (1,  1)
                              , (1, -1)
@@ -159,20 +159,21 @@ narrow seed state = if Set.null seed then [state] else
 
 match :: Index -> State -> (FourLines -> Bool) -> Bool -> Bool
 match i (State cells _) f x = (not (inRange (bounds cells) i)) 
-                || check (cells!i)
+                           || check (cells!i)
     where check (Space xs) = any ((==x).f) xs
           check _ = undefined -- can't happen
 
 matchl :: Index -> State -> Bool -> Bool
-matchl i (State cells _) x = if inRange (bounds cells) i
-                      then check (cells!i)
-                      else x == False -- no lines allowed outside grid
+matchl i (State cells _) x = 
+    if inRange (bounds cells) i
+       then check (cells!i)
+       else x == False -- no lines allowed outside grid
     where check (Line ls _) = x `elem` ls
           check _ = undefined -- can't happen
 
 match2 :: Index -> State -> (FourLines -> Bool) -> Bool -> (FourLines -> Bool) -> Bool -> Bool
 match2 i (State cells _) f1 x1 f2 x2 = (not (inRange (bounds cells) i)) 
-                || check (cells!i)
+                                    || check (cells!i)
     where check (Space xs) = any (\x -> f1 x == x1 && f2 x == x2) xs
           check _ = undefined -- can't happen
 

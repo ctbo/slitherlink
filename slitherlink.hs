@@ -7,6 +7,7 @@ import Data.Array.IArray
 import Control.Monad
 import Control.Monad.Instances()
 import System.Environment
+import Data.List (find)
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Debug.Trace
@@ -191,15 +192,29 @@ solve' depth state@(State cells loops) =
 --    (if depth >= 35 then trace (showState state) else id) $
     case loops of
          Pieces p -> if Map.null p
-                     then [] -- FIXME: should try setting a line somewhere
+                     then case find undecided evenGrid of
+                               Just i -> continueAt i
+                               Nothing -> []
                      else continueAt $ head $ Map.keys p
-         OneLoop -> [state]
+         OneLoop -> zeroRemainingLines state
          Invalid -> []
-    where continueAt i = concat $ parMap rseq fix list
+    where ((0, 0), (rn, cn)) = bounds cells
+          evenGrid = [(r, c) | r <- [0, 2 .. rn], c <- [0, 2 .. cn]]
+          undecided i = undecided' (cells!i)
+          undecided' (Space (_:_:_) _) = True -- list has at least 2 elements
+          undecided' _ = False 
+          continueAt i = concat $ parMap rseq fix list
             where (Space list cst) = cells!i
                   fix ss = narrow neighbors (State (cells // [(i, Space [ss] cst)]) loops) >>= solve' (depth+1)
                   neighbors = Set.fromList $ map (i .+) directions8
-          
+
+zeroRemainingLines :: State -> [State]
+zeroRemainingLines state = foldM zeroLine state (indices (sCells state)) >>= narrowAll
+    where zeroLine state@(State cells loops) i = case cells!i of
+                   Line [True] -> [state]
+                   Line [False, True] -> [State (cells // [(i, Line [False])]) loops]
+                   _ -> [state]
+
 hasLine :: CellState -> Bool
 hasLine (Space ls _) = not (FourLines False False False False `elem` ls)
 hasLine _            = undefined -- can't happen

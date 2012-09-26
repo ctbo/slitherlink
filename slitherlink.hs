@@ -12,6 +12,7 @@ import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Debug.Trace
 import Control.Parallel.Strategies
+import System.Random
 
 data Constraint = Unconstrained | Exactly Int deriving (Eq)
 instance Show Constraint where
@@ -90,10 +91,11 @@ flListXing = filter (zeroOrTwo.countLines) flListAll
 data CellState = Line [Bool]
                | Space [FourLines] (Maybe Constraint) deriving (Eq, Show)
 data State =  State { sCells :: Array Index CellState
-                    , sLoops :: LoopStatus }
+                    , sLoops :: LoopStatus
+                    , sGen :: StdGen }
 
 stateFromProblem :: Problem -> State
-stateFromProblem p = State (array ((0, 0), (rows, columns)) cells) (Pieces Map.empty)
+stateFromProblem p = State (array ((0, 0), (rows, columns)) cells) (Pieces Map.empty) (mkStdGen 42)
   where ((0, 0), (rn, cn)) = bounds p
         rows    = 2*rn + 2
         columns = 2*cn + 2
@@ -140,7 +142,7 @@ narrow seed state = if Set.null seed then [state] else
                                      else addSegment (r, c-1) (r, c+1) (sLoops state)
                                 else sLoops state
                  in if newLoops /= Invalid
-                    then narrow (Set.union seed' newSeeds) (State (sCells state // [(i, Line ls')]) newLoops)
+                    then narrow (Set.union seed' newSeeds) (State (sCells state // [(i, Line ls')]) newLoops (sGen state))
                     else []
       Space ss cst -> do
         let ss' = filter ((matchl (r-1, c) state).top)
@@ -157,16 +159,16 @@ narrow seed state = if Set.null seed then [state] else
           else if ss' == ss
             then narrow seed' state
             else let newSeeds = Set.fromList $ map (i .+) directions8
-                 in narrow (Set.union seed' newSeeds) (State (sCells state // [(i, Space ss' cst)]) (sLoops state))
+                 in narrow (Set.union seed' newSeeds) (State (sCells state // [(i, Space ss' cst)]) (sLoops state) (sGen state))
 
 match :: Index -> State -> (FourLines -> Bool) -> Bool -> Bool
-match i (State cells _) f x = (not (inRange (bounds cells) i)) 
+match i (State cells _ _) f x = (not (inRange (bounds cells) i)) 
                            || check (cells!i)
     where check (Space xs _) = any ((==x).f) xs
           check _ = undefined -- can't happen
 
 matchl :: Index -> State -> Bool -> Bool
-matchl i (State cells _) x = 
+matchl i (State cells _ _) x = 
     if inRange (bounds cells) i
        then check (cells!i)
        else x == False -- no lines allowed outside grid
@@ -174,7 +176,7 @@ matchl i (State cells _) x =
           check _ = undefined -- can't happen
 
 match2 :: (Int, Int) -> State -> [(FourLines->Bool, FourLines->Bool)] -> FourLines -> Bool
-match2 i (State cells _) fps thiscell = (not (inRange (bounds cells) i)) || any ok otherlist
+match2 i (State cells _ _) fps thiscell = (not (inRange (bounds cells) i)) || any ok otherlist
     where Space otherlist _ = cells!i
           ok othercell = all pairmatch fps
               where pairmatch (otherf, thisf) = thisf thiscell == otherf othercell
@@ -188,14 +190,14 @@ solve problem = do
     solve' 0 state
 
 solve' :: Int -> State -> [State]
-solve' depth state@(State cells loops) =
+solve' depth state@(State cells loops gen) =
 --    (if depth >= 35 then trace (showState state) else id) $
     case loops of
          Pieces p -> if Map.null p
                      then case find undecided evenGrid of
-                               Just i -> continueAt i
+                               Just i -> continueAt (i, gen)
                                Nothing -> []
-                     else continueAt $ head $ Map.keys p
+                     else continueAt (randomKey p gen)
          OneLoop -> zeroRemainingLines state
          Invalid -> []
     where ((0, 0), (rn, cn)) = bounds cells
@@ -203,16 +205,18 @@ solve' depth state@(State cells loops) =
           undecided i = undecided' (cells!i)
           undecided' (Space (_:_:_) _) = True -- list has at least 2 elements
           undecided' _ = False 
-          continueAt i = concat $ parMap rseq fix list
+          randomKey m gen = let (r, gen') = randomR (0, Map.size m - 1) gen
+                            in (Map.keys m !! r, gen')
+          continueAt (i, gen) = concat $ parMap rseq fix list
             where (Space list cst) = cells!i
-                  fix ss = narrow neighbors (State (cells // [(i, Space [ss] cst)]) loops) >>= solve' (depth+1)
+                  fix ss = narrow neighbors (State (cells // [(i, Space [ss] cst)]) loops gen) >>= solve' (depth+1)
                   neighbors = Set.fromList $ map (i .+) directions8
 
 zeroRemainingLines :: State -> [State]
 zeroRemainingLines state = foldM zeroLine state (indices (sCells state)) >>= narrowAll
-    where zeroLine state@(State cells loops) i = case cells!i of
+    where zeroLine state@(State cells loops gen) i = case cells!i of
                    Line [True] -> [state]
-                   Line [False, True] -> [State (cells // [(i, Line [False])]) loops]
+                   Line [False, True] -> [State (cells // [(i, Line [False])]) loops gen]
                    _ -> [state]
 
 hasLine :: CellState -> Bool
@@ -220,7 +224,7 @@ hasLine (Space ls _) = not (FourLines False False False False `elem` ls)
 hasLine _            = undefined -- can't happen
 
 showState :: State -> String
-showState (State cells _) = (unlines $ map oneLine [r0 .. rn])
+showState (State cells _ _) = (unlines $ map oneLine [r0 .. rn])
   where ((r0, c0), (rn, cn)) = bounds cells
         oneLine r = concat $ map (oneCell r) [c0 .. cn]
         oneCell r c 

@@ -113,9 +113,6 @@ joinPatterns (Pattern maskA valA) (Pattern maskB valB) =
                                         , let m = maskA .&. maskB
                                         , a .&. m == b .&. m ]
 
-foldPatterns :: [Pattern] -> [Pattern]
-foldPatterns ps = zipWith joinPatterns ps (tail ps)
-
 stateFromProblem :: Problem -> State
 stateFromProblem p = State { sMask = 0, sVal = 0, loops = [], dotsMask = dm, linesMask = lm }
     where ((0, 0), (rn, cn)) = bounds p

@@ -206,7 +206,8 @@ solve' depth state@(State cells loops gen) =
           undecided' (Space (_:_:_) _) = True -- list has at least 2 elements
           undecided' _ = False 
           randomKey m gen = let (r, gen') = randomR (0, Map.size m - 1) gen
-                            in (Map.keys m !! r, gen')
+                                (i, _) = Map.elemAt r m
+                            in (i, gen')
           continueAt (i, gen) = concat $ parMap rseq fix list
             where (Space list cst) = cells!i
                   fix ss = narrow neighbors (State (cells // [(i, Space [ss] cst)]) loops gen) >>= solve' (depth+1)

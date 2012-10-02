@@ -141,6 +141,10 @@ vertical (r,c) = odd r
 cornersAtLine :: LineIndex -> (SpaceIndex, SpaceIndex)
 cornersAtLine i = if vertical i then (i .+ (-1, 0), i .+ (1, 0))
                                 else (i .+ (0, -1), i .+ (0, 1))
+                                
+allCornerIndices :: State -> [SpaceIndex]
+allCornerIndices state = [(r, c) | r <- [0, 2 .. rn], c <- [0, 2 .. cn]]
+    where ((0, 0), (rn, cn)) = bounds (sSpaces state)
 
 allLineIndices :: State -> [LineIndex]
 allLineIndices state = lefts $ allIndices state
@@ -245,8 +249,7 @@ solve' depth state =
                      else continueAt $ head $ Map.keys p
          OneLoop -> zeroRemainingLines state
          Invalid -> []
-    where ((0, 0), (rn, cn)) = bounds (sSpaces state)
-          evenGrid = [(r, c) | r <- [0, 2 .. rn], c <- [0, 2 .. cn]]
+    where evenGrid = allCornerIndices state
           undecided i = undecided' (sSpaces state ! i)
           undecided' (Space (_:_:_) _) = True -- list has at least 2 elements
           undecided' _ = False 

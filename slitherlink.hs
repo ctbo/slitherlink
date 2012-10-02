@@ -211,27 +211,17 @@ zeroRemainingLines state = foldM zeroLine state (indices (sCells state)) >>= nar
                    Line [False, True] -> [State (cells // [(i, Line [False])]) loops]
                    _ -> [state]
 
-hasLine :: CellState -> Bool
-hasLine (Space ls _) = not (FourLines False False False False `elem` ls)
-hasLine _            = undefined -- can't happen
-
 showState :: State -> String
-showState (State cells _) = (unlines $ map oneLine [r0 .. rn])
+showState (State cells _) = unlines $ map oneLine [r0 .. rn]
   where ((r0, c0), (rn, cn)) = bounds cells
         oneLine r = concat $ map (oneCell r) [c0 .. cn]
-        oneCell r c 
-          | even r && even c = showDot $ cells ! (r, c)
-          | odd r && odd c = showConstraint $ cells ! (r, c)
-          | otherwise = showLine (isVertical r) $ cells ! (r, c)
-        isVertical = odd
-        showLine vertical s = case s of
-          Line [True]  -> if vertical then "|" else "-"
-          Line [False] -> " "
-          Line _       -> "?"
-          _            -> undefined -- can't happen
-        showDot s = if hasLine s then "+" else " "
-        showConstraint (Space _ (Just cst)) = show cst
-        showConstraint _             = undefined -- can't happen
+        oneCell r c = showCell (odd r) $ cells!(r, c)
+        showCell vertical (Line [True])        = if vertical then "|" else "-"
+        showCell _        (Line [False])       = " "
+        showCell _        (Line _)             = "?"
+        showCell _        (Space _ (Just cst)) = show cst
+        showCell _        (Space ls Nothing)   = if hasLine ls then "+" else " "
+        hasLine ls = not (FourLines False False False False `elem` ls)
 
 main :: IO ()
 main = do

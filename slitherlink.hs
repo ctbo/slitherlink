@@ -159,7 +159,7 @@ narrow seed state = if Set.null seed then [state] else
             else narrowSpace si seed' state
 
 narrowLine :: LineIndex -> Seed -> State -> [State]
-narrowLine i@(r,c) seed' state = 
+narrowLine i seed' state = 
     case (sLines state)!i of
       Line ls -> do
         let ls' = filter (\b -> all (\(si, lineThere) -> match si state lineThere b) $
@@ -177,7 +177,7 @@ narrowLine i@(r,c) seed' state =
                     else []
 
 narrowSpace :: SpaceIndex -> Seed -> State -> [State]
-narrowSpace i@(r,c) seed' state = 
+narrowSpace i seed' state = 
     case (sSpaces state)!i of
       Space ss cst -> do
         let ss' = filter (\x -> all (\(li, lineThere) -> matchl li state lineThere) $

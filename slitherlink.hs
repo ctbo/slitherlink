@@ -8,6 +8,7 @@ import Control.Monad
 import Control.Monad.Instances()
 import System.Environment
 import Data.List (find)
+import Data.Either
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Debug.Trace
@@ -31,8 +32,10 @@ type ProblemList = [[Constraint]]
 readProblemList ::  String -> Either String ProblemList
 readProblemList = (mapM . mapM) readConstraint . lines
 
+type SpaceIndex = (Int, Int)
+type LineIndex = (Int, Int)
 type Index = (Int, Int)
-type Problem = Array Index Constraint
+type Problem = Array SpaceIndex Constraint
 
 readProblem :: String -> Either String Problem
 readProblem s = do
@@ -83,20 +86,25 @@ flConstraint (Exactly n) = filter ((==n) . countLines) flAll
 flXing :: [FourLines]
 flXing = filter (\fl -> countLines fl `elem` [0, 2]) flAll
 
-data CellState = Line [Bool]
-               | Space [FourLines] (Maybe Constraint) deriving (Eq, Show)
-data State =  State { sCells :: Array Index CellState
+data LineState = Line [Bool]
+data SpaceState = Space [FourLines] (Maybe Constraint) deriving (Eq, Show)
+data State =  State { sSpaces :: Array SpaceIndex SpaceState
+                    , sLines :: Array LineIndex LineState
                     , sLoops :: LoopStatus }
 
 stateFromProblem :: Problem -> State
-stateFromProblem p = State (array ((0, 0), (rows, columns)) cells) (Pieces Map.empty)
+stateFromProblem p =
+    State (array ((0, 0), (rows, columns)) spaces)
+          (array ((0, 0), (rows, columns)) lines)
+          (Pieces Map.empty)
   where ((0, 0), (rn, cn)) = bounds p
         rows    = 2*rn + 2
         columns = 2*cn + 2
-        cells = [((r, c), Space flXing Nothing) | r <- [0, 2 .. 2*rn+2], c <- [0, 2 .. 2*cn+2]]
-             ++ [((r, c), Line [False, True]) | r <- [0, 2 .. 2*rn+2], c <- [1, 3 .. 2*cn+1]]
-             ++ [((r, c), Line [False, True]) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
+        spaces = [((r, c), Space flXing Nothing) | r <- [0, 2 .. 2*rn+2], c <- [0, 2 .. 2*cn+2]]
              ++ [((2*r+1, 2*c+1), Space (flConstraint cst) (Just cst))| r <- [0 .. rn], c <- [0 .. cn], let cst=p!(r, c)]
+
+        lines = [((r, c), Line [False, True]) | r <- [0, 2 .. 2*rn+2], c <- [1, 3 .. 2*cn+1]]
+             ++ [((r, c), Line [False, True]) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
 
 type Direction = (Int, Int)
 directions4 :: [Direction] -- right, down, left, up
@@ -107,11 +115,38 @@ directions8 = directions4 ++ [(1, 1), (1, -1), (-1, -1), (-1, 1)]
 (.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
 (a, b) .+ (c, d) = (a+c, b+d)
 
-narrow :: Set.Set Index -> State -> [State]
+indexType :: Index -> Either LineIndex SpaceIndex
+indexType (r,c) = if even r == even c then Right (r,c) else Left (r,c)
+
+lineNeighbors :: LineIndex -> [Either LineIndex SpaceIndex]
+lineNeighbors i = map indexType $ map (i .+) directions4
+
+spaceNeighbors :: SpaceIndex -> [Either LineIndex SpaceIndex]
+spaceNeighbors i = map indexType $ map (i .+) directions8
+
+allLineIndices :: State -> [LineIndex]
+allLineIndices state = lefts $ allIndices state
+
+allIndices :: State -> [Either LineIndex SpaceIndex]
+allIndices state = map indexType $ indices (sSpaces state)
+
+type Seed = Set.Set (Either LineIndex SpaceIndex) 
+
+narrow :: Seed -> State -> [State]
 narrow seed state = if Set.null seed then [state] else
-    let (i@(r,c), seed') = Set.deleteFindMin seed in
-      if not (inRange (bounds (sCells state)) i) then narrow seed' state else
-    case (sCells state)!i of
+    case Set.deleteFindMin seed of
+        (Left li, seed') ->
+            if not (inRange (bounds (sLines state)) li)
+            then narrow seed' state
+            else narrowLine li seed' state
+        (Right si, seed') -> 
+            if not (inRange (bounds (sSpaces state)) si)
+            then narrow seed' state
+            else narrowSpace si seed' state
+
+narrowLine :: LineIndex -> Seed -> State -> [State]
+narrowLine i@(r,c) seed' state = 
+    case (sLines state)!i of
       Line ls -> do
         let ls' = filter (match (r-1, c) state bottom)
                 $ filter (match (r, c+1) state left)
@@ -121,15 +156,19 @@ narrow seed state = if Set.null seed then [state] else
           then [] 
           else if ls' == ls 
             then narrow seed' state 
-            else let newSeeds = Set.fromList $ map (i .+) directions4
+            else let newSeeds = Set.fromList $ lineNeighbors i
                      newLoops = if ls' == [True]
                                 then if odd r
                                      then addSegment (r-1, c) (r+1, c) (sLoops state)
                                      else addSegment (r, c-1) (r, c+1) (sLoops state)
                                 else sLoops state
                  in if newLoops /= Invalid
-                    then narrow (Set.union seed' newSeeds) (State (sCells state // [(i, Line ls')]) newLoops)
+                    then narrow (Set.union seed' newSeeds) (State (sSpaces state) (sLines state // [(i, Line ls')]) newLoops)
                     else []
+
+narrowSpace :: SpaceIndex -> Seed -> State -> [State]
+narrowSpace i@(r,c) seed' state = 
+    case (sSpaces state)!i of
       Space ss cst -> do
         let ss' = filter ((matchl (r-1, c) state) . top)
                 $ filter ((matchl (r, c+1) state) . right)
@@ -144,31 +183,29 @@ narrow seed state = if Set.null seed then [state] else
           then []
           else if ss' == ss
             then narrow seed' state
-            else let newSeeds = Set.fromList $ map (i .+) directions8
-                 in narrow (Set.union seed' newSeeds) (State (sCells state // [(i, Space ss' cst)]) (sLoops state))
+            else let newSeeds = Set.fromList $ spaceNeighbors i
+                 in narrow (Set.union seed' newSeeds) (State (sSpaces state // [(i, Space ss' cst)]) (sLines state) (sLoops state))
 
-match :: Index -> State -> (FourLines -> Bool) -> Bool -> Bool
-match i (State cells _) f x = (not (inRange (bounds cells) i)) 
-                           || check (cells!i)
+match :: SpaceIndex -> State -> (FourLines -> Bool) -> Bool -> Bool
+match i state f x = (not (inRange (bounds (sSpaces state)) i))
+                           || check (sSpaces state ! i)
     where check (Space xs _) = any ((==x).f) xs
-          check _ = undefined -- can't happen
 
-matchl :: Index -> State -> Bool -> Bool
-matchl i (State cells _) x = 
-    if inRange (bounds cells) i
-       then check (cells!i)
+matchl :: LineIndex -> State -> Bool -> Bool
+matchl i state x = 
+    if inRange (bounds (sLines state)) i
+       then check (sLines state ! i)
        else x == False -- no lines allowed outside grid
     where check (Line ls) = x `elem` ls
-          check _ = undefined -- can't happen
 
 match2 :: (Int, Int) -> State -> [(FourLines->Bool, FourLines->Bool)] -> FourLines -> Bool
-match2 i (State cells _) fps thiscell = (not (inRange (bounds cells) i)) || any ok otherlist
-    where Space otherlist _ = cells!i
+match2 i state fps thiscell = (not (inRange (bounds (sSpaces state)) i)) || any ok otherlist
+    where Space otherlist _ = sSpaces state ! i
           ok othercell = all pairmatch fps
               where pairmatch (otherf, thisf) = thisf thiscell == otherf othercell
 
 narrowAll :: State -> [State]
-narrowAll state = narrow (Set.fromList (indices (sCells state))) state
+narrowAll state = narrow (Set.fromList (allIndices state)) state
 
 solve :: Problem -> [State]
 solve problem = do
@@ -176,7 +213,7 @@ solve problem = do
     solve' 0 state
 
 solve' :: Int -> State -> [State]
-solve' depth state@(State cells loops) =
+solve' depth state@(State spaces lines loops) =
 --    (if depth >= 35 then trace (showState state) else id) $
     case loops of
          Pieces p -> if Map.null p
@@ -186,33 +223,35 @@ solve' depth state@(State cells loops) =
                      else continueAt $ head $ Map.keys p
          OneLoop -> zeroRemainingLines state
          Invalid -> []
-    where ((0, 0), (rn, cn)) = bounds cells
+    where ((0, 0), (rn, cn)) = bounds spaces
           evenGrid = [(r, c) | r <- [0, 2 .. rn], c <- [0, 2 .. cn]]
-          undecided i = undecided' (cells!i)
+          undecided i = undecided' (spaces ! i)
           undecided' (Space (_:_:_) _) = True -- list has at least 2 elements
           undecided' _ = False 
           continueAt i = concat $ parMap rseq fix list
-            where (Space list cst) = cells!i
-                  fix ss = narrow neighbors (State (cells // [(i, Space [ss] cst)]) loops) >>= solve' (depth+1)
-                  neighbors = Set.fromList $ map (i .+) directions8
+            where (Space list cst) = spaces ! i
+                  fix ss = narrow neighbors (State (spaces // [(i, Space [ss] cst)]) lines loops) >>= solve' (depth+1)
+                  neighbors = Set.fromList $ spaceNeighbors i
 
 zeroRemainingLines :: State -> [State]
-zeroRemainingLines state = foldM zeroLine state (indices (sCells state)) >>= narrowAll
-    where zeroLine state@(State cells loops) i = case cells!i of
+zeroRemainingLines state = foldM zeroLine state (allLineIndices state) >>= narrowAll
+    where zeroLine state@(State spaces lines loops) i = case lines ! i of
                    Line [True] -> [state]
-                   Line [False, True] -> [State (cells // [(i, Line [False])]) loops]
+                   Line [False, True] -> [State spaces (lines // [(i, Line [False])]) loops]
                    _ -> [state]
 
 showState :: State -> String
-showState (State cells _) = unlines $ map oneLine [r0 .. rn]
-  where ((r0, c0), (rn, cn)) = bounds cells
+showState (State spaces lines _) = unlines $ map oneLine [r0 .. rn]
+  where ((r0, c0), (rn, cn)) = bounds spaces
         oneLine r = concat $ map (oneCell r) [c0 .. cn]
-        oneCell r c = showCell (odd r) $ cells!(r, c)
-        showCell vertical (Line [True])        = if vertical then "|" else "-"
-        showCell _        (Line [False])       = " "
-        showCell _        (Line _)             = "?"
-        showCell _        (Space _ (Just cst)) = show cst
-        showCell _        (Space ls Nothing)   = if hasLine ls then "+" else " "
+        oneCell r c = case indexType (r,c) of
+            Left (r,c) -> showLine (odd r) $ lines ! (r, c)
+            Right (r,c) -> showSpace $ spaces ! (r, c)
+        showLine vertical (Line [True])        = if vertical then "|" else "-"
+        showLine _        (Line [False])       = " "
+        showLine _        (Line _)             = "?"
+        showSpace         (Space _ (Just cst)) = show cst
+        showSpace         (Space ls Nothing)   = if hasLine ls then "+" else " "
         hasLine ls = not (FourLines False False False False `elem` ls)
 
 main :: IO ()

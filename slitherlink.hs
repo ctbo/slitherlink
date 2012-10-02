@@ -69,19 +69,19 @@ data FourLines = FourLines { top :: Bool
 countLines :: FourLines -> Int
 countLines x = sum [ 1 | True <- [ top x, right x, bottom x, left x]]
 
-flListAll :: [FourLines]
-flListAll = [FourLines t r b l | t <- [False, True]
-                               , r <- [False, True]
-                               , b <- [False, True]
-                               , l <- [False, True]
-            ]
+flAll :: [FourLines]
+flAll = [FourLines t r b l | t <- [False, True]
+                           , r <- [False, True]
+                           , b <- [False, True]
+                           , l <- [False, True]
+        ]
 
-flListForConstraint :: Constraint -> [FourLines]
-flListForConstraint Unconstrained = flListAll
-flListForConstraint (Exactly n) = filter ((==n) . countLines) flListAll
+flConstraint :: Constraint -> [FourLines]
+flConstraint Unconstrained = flAll
+flConstraint (Exactly n) = filter ((==n) . countLines) flAll
 
-flListXing :: [FourLines]
-flListXing = filter (\fl -> countLines fl `elem` [0, 2]) flListAll
+flXing :: [FourLines]
+flXing = filter (\fl -> countLines fl `elem` [0, 2]) flAll
 
 data CellState = Line [Bool]
                | Space [FourLines] (Maybe Constraint) deriving (Eq, Show)
@@ -93,24 +93,16 @@ stateFromProblem p = State (array ((0, 0), (rows, columns)) cells) (Pieces Map.e
   where ((0, 0), (rn, cn)) = bounds p
         rows    = 2*rn + 2
         columns = 2*cn + 2
-        cells = [((r, c), Space flListXing Nothing) | r <- [0, 2 .. 2*rn+2], c <- [0, 2 .. 2*cn+2]]
+        cells = [((r, c), Space flXing Nothing) | r <- [0, 2 .. 2*rn+2], c <- [0, 2 .. 2*cn+2]]
              ++ [((r, c), Line [False, True]) | r <- [0, 2 .. 2*rn+2], c <- [1, 3 .. 2*cn+1]]
              ++ [((r, c), Line [False, True]) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
-             ++ [((2*r+1, 2*c+1), Space (flListForConstraint cst) (Just cst))| r <- [0 .. rn], c <- [0 .. cn], let cst=p!(r, c)]
+             ++ [((2*r+1, 2*c+1), Space (flConstraint cst) (Just cst))| r <- [0 .. rn], c <- [0 .. cn], let cst=p!(r, c)]
 
 type Direction = (Int, Int)
 directions4 :: [Direction] -- right, down, left, up
-directions4 = [ (0, 1)
-              , (1, 0)
-              , (0,-1)
-              , (-1,0)
-              ]
+directions4 = [(0, 1), (1, 0), (0, -1), (-1, 0)]
 directions8 :: [Direction] -- right down, down left, left up, up right
-directions8 = directions4 ++ [ (1,  1)
-                             , (1, -1)
-                             , (-1,-1)
-                             , (-1, 1)
-                             ]
+directions8 = directions4 ++ [(1, 1), (1, -1), (-1, -1), (-1, 1)]
 
 (.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
 (a, b) .+ (c, d) = (a+c, b+d)

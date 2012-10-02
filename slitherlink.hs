@@ -49,8 +49,8 @@ readProblem s = do
 
 data LoopStatus = Pieces (Map.Map Index Index) | OneLoop | Invalid deriving (Show, Eq)
  
-addSegment :: Index -> Index -> LoopStatus -> LoopStatus
-addSegment i j (Pieces l) = 
+addSegment :: (Index, Index) -> LoopStatus -> LoopStatus
+addSegment (i,j) (Pieces l) = 
     case (Map.lookup i l,  Map.lookup j l) of
       (Nothing, Nothing) -> Pieces $ Map.insert i  j  $ Map.insert j  i  l
       (Just i', Nothing) -> Pieces $ Map.insert i' j  $ Map.insert j  i' $ Map.delete i l
@@ -61,7 +61,7 @@ addSegment i j (Pieces l) =
                                        else Invalid -- a loop has closed but there is more
                                else Pieces $ Map.insert i' j' $ Map.insert j' i'
                                            $ Map.delete i     $ Map.delete j     l
-addSegment _ _ _ = Invalid
+addSegment _ _ = Invalid
 
 data FourLines = FourLines { top :: Bool
                            , right :: Bool
@@ -109,8 +109,10 @@ stateFromProblem p =
 type Direction = (Int, Int)
 directions4 :: [Direction] -- right, down, left, up
 directions4 = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+diagonals4 :: [Direction]
+diagonals4 = [(1, 1), (1, -1), (-1, -1), (-1, 1)]
 directions8 :: [Direction] -- right down, down left, left up, up right
-directions8 = directions4 ++ [(1, 1), (1, -1), (-1, -1), (-1, 1)]
+directions8 = directions4 ++ diagonals4
 
 (.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
 (a, b) .+ (c, d) = (a+c, b+d)
@@ -121,8 +123,20 @@ indexType (r,c) = if even r == even c then Right (r,c) else Left (r,c)
 lineNeighbors :: LineIndex -> [Either LineIndex SpaceIndex]
 lineNeighbors i = map indexType $ map (i .+) directions4
 
+linesAtSpace :: SpaceIndex -> [LineIndex]
+linesAtSpace i = map (i .+) directions4
+
+spacesAtLine :: LineIndex -> [SpaceIndex]
+spacesAtLine i = map (i .+) directions4
+
+spacesAtSpace :: SpaceIndex -> [LineIndex]
+spacesAtSpace i = map (i .+) diagonals4
+
 spaceNeighbors :: SpaceIndex -> [Either LineIndex SpaceIndex]
 spaceNeighbors i = map indexType $ map (i .+) directions8
+
+cornersAtLine :: LineIndex -> (SpaceIndex, SpaceIndex)
+cornersAtLine (r,c) = if odd r then ((r-1, c), (r+1, c)) else ((r, c-1),(r, c+1))
 
 allLineIndices :: State -> [LineIndex]
 allLineIndices state = lefts $ allIndices state
@@ -148,19 +162,15 @@ narrowLine :: LineIndex -> Seed -> State -> [State]
 narrowLine i@(r,c) seed' state = 
     case (sLines state)!i of
       Line ls -> do
-        let ls' = filter (match (r-1, c) state bottom)
-                $ filter (match (r, c+1) state left)
-                $ filter (match (r+1, c) state top)
-                $ filter (match (r, c-1) state right) ls
+        let ls' = filter (\b -> all (\(si, lineThere) -> match si state lineThere b) $
+                            zip (spacesAtLine i)  [left, top, right, bottom]) ls
         if null ls' 
           then [] 
           else if ls' == ls 
             then narrow seed' state 
             else let newSeeds = Set.fromList $ lineNeighbors i
                      newLoops = if ls' == [True]
-                                then if odd r
-                                     then addSegment (r-1, c) (r+1, c) (sLoops state)
-                                     else addSegment (r, c-1) (r, c+1) (sLoops state)
+                                then addSegment (cornersAtLine i) (sLoops state)
                                 else sLoops state
                  in if newLoops /= Invalid
                     then narrow (Set.union seed' newSeeds) (State (sSpaces state) (sLines state // [(i, Line ls')]) newLoops)
@@ -170,14 +180,13 @@ narrowSpace :: SpaceIndex -> Seed -> State -> [State]
 narrowSpace i@(r,c) seed' state = 
     case (sSpaces state)!i of
       Space ss cst -> do
-        let ss' = filter ((matchl (r-1, c) state) . top)
-                $ filter ((matchl (r, c+1) state) . right)
-                $ filter ((matchl (r+1, c) state) . bottom)
-                $ filter ((matchl (r, c-1) state) . left) 
-                $ filter (match2 (r-1, c-1) state [(bottom, left), (right, top)])
-                $ filter (match2 (r-1, c+1) state [(bottom, right), (left, top)])
-                $ filter (match2 (r+1, c-1) state [(top, left), (right, bottom)])
-                $ filter (match2 (r+1, c+1) state [(top, right), (left, bottom)]) 
+        let ss' = filter (\x -> all (\(li, lineThere) -> matchl li state lineThere) $
+                            zip (linesAtSpace i)  [right x, bottom x, left x, top x])
+                $ filter (\x -> all (\(si, linesThere) -> match2 si state linesThere x) $
+                            zip (spacesAtSpace i) [[(top, right), (left, bottom)],
+                                                   [(top, left), (right, bottom)],
+                                                   [(bottom, left), (right, top)],
+                                                   [(bottom, right), (left, top)]])
                 ss
         if null ss'
           then []
@@ -198,11 +207,12 @@ matchl i state x =
        else x == False -- no lines allowed outside grid
     where check (Line ls) = x `elem` ls
 
-match2 :: (Int, Int) -> State -> [(FourLines->Bool, FourLines->Bool)] -> FourLines -> Bool
+match2 :: (Int, Int) -> State -> [(FourLines -> Bool, FourLines -> Bool)] -> FourLines -> Bool
 match2 i state fps thiscell = (not (inRange (bounds (sSpaces state)) i)) || any ok otherlist
     where Space otherlist _ = sSpaces state ! i
           ok othercell = all pairmatch fps
               where pairmatch (otherf, thisf) = thisf thiscell == otherf othercell
+
 
 narrowAll :: State -> [State]
 narrowAll state = narrow (Set.fromList (allIndices state)) state

@@ -182,7 +182,9 @@ narrowLine i seed' state =
                                 then addSegment (cornersAtLine i) (sLoops state)
                                 else sLoops state
                  in if newLoops /= Invalid
-                    then narrow (Set.union seed' newSeeds) (State (sSpaces state) (sLines state // [(i, Line ls')]) newLoops)
+                    then narrow (Set.union seed' newSeeds) $
+                        state { sLines = sLines state // [(i, Line ls')],
+                                sLoops = newLoops}
                     else []
 
 narrowSpace :: SpaceIndex -> Seed -> State -> [State]
@@ -202,7 +204,8 @@ narrowSpace i seed' state =
           else if ss' == ss
             then narrow seed' state
             else let newSeeds = Set.fromList $ spaceNeighbors i
-                 in narrow (Set.union seed' newSeeds) (State (sSpaces state // [(i, Space ss' cst)]) (sLines state) (sLoops state))
+                 in narrow (Set.union seed' newSeeds) $
+                    state { sSpaces = sSpaces state // [(i, Space ss' cst)] }
 
 match :: SpaceIndex -> State -> (FourLines -> Bool) -> Bool -> Bool
 match i state f x = (not (inRange (bounds (sSpaces state)) i))
@@ -232,9 +235,9 @@ solve problem = do
     solve' 0 state
 
 solve' :: Int -> State -> [State]
-solve' depth state@(State spaces lines loops) =
+solve' depth state =
 --    (if depth >= 35 then trace (showState state) else id) $
-    case loops of
+    case sLoops state of
          Pieces p -> if Map.null p
                      then case find undecided evenGrid of
                                Just i -> continueAt i
@@ -242,21 +245,22 @@ solve' depth state@(State spaces lines loops) =
                      else continueAt $ head $ Map.keys p
          OneLoop -> zeroRemainingLines state
          Invalid -> []
-    where ((0, 0), (rn, cn)) = bounds spaces
+    where ((0, 0), (rn, cn)) = bounds (sSpaces state)
           evenGrid = [(r, c) | r <- [0, 2 .. rn], c <- [0, 2 .. cn]]
-          undecided i = undecided' (spaces ! i)
+          undecided i = undecided' (sSpaces state ! i)
           undecided' (Space (_:_:_) _) = True -- list has at least 2 elements
           undecided' _ = False 
           continueAt i = concat $ parMap rseq fix list
-            where (Space list cst) = spaces ! i
-                  fix ss = narrow neighbors (State (spaces // [(i, Space [ss] cst)]) lines loops) >>= solve' (depth+1)
+            where (Space list cst) = sSpaces state ! i
+                  fix ss = narrow neighbors (state { sSpaces = sSpaces state // [(i, Space [ss] cst)] })
+                                 >>= solve' (depth+1)
                   neighbors = Set.fromList $ spaceNeighbors i
 
 zeroRemainingLines :: State -> [State]
 zeroRemainingLines state = foldM zeroLine state (allLineIndices state) >>= narrowAll
-    where zeroLine state@(State spaces lines loops) i = case lines ! i of
+    where zeroLine state i = case sLines state ! i of
                    Line [True] -> [state]
-                   Line [False, True] -> [State spaces (lines // [(i, Line [False])]) loops]
+                   Line [False, True] -> [state { sLines = sLines state // [(i, Line [False])] }]
                    _ -> [state]
 
 showState :: State -> String

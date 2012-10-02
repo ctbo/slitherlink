@@ -135,8 +135,12 @@ spacesAtSpace i = map (i .+) diagonals4
 spaceNeighbors :: SpaceIndex -> [Either LineIndex SpaceIndex]
 spaceNeighbors i = map indexType $ map (i .+) directions8
 
+vertical :: LineIndex -> Bool
+vertical (r,c) = odd r
+
 cornersAtLine :: LineIndex -> (SpaceIndex, SpaceIndex)
-cornersAtLine (r,c) = if odd r then ((r-1, c), (r+1, c)) else ((r, c-1),(r, c+1))
+cornersAtLine i = if vertical i then (i .+ (-1, 0), i .+ (1, 0))
+                                else (i .+ (0, -1), i .+ (0, 1))
 
 allLineIndices :: State -> [LineIndex]
 allLineIndices state = lefts $ allIndices state
@@ -255,8 +259,8 @@ showState (State spaces lines _) = unlines $ map oneLine [r0 .. rn]
   where ((r0, c0), (rn, cn)) = bounds spaces
         oneLine r = concat $ map (oneCell r) [c0 .. cn]
         oneCell r c = case indexType (r,c) of
-            Left (r,c) -> showLine (odd r) $ lines ! (r, c)
-            Right (r,c) -> showSpace $ spaces ! (r, c)
+            Left li -> showLine (vertical li) $ lines ! li
+            Right si -> showSpace $ spaces ! si
         showLine vertical (Line [True])        = if vertical then "|" else "-"
         showLine _        (Line [False])       = " "
         showLine _        (Line _)             = "?"

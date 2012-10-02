@@ -67,8 +67,7 @@ data FourLines = FourLines { top :: Bool
                            } deriving (Eq, Show)
 
 countLines :: FourLines -> Int
-countLines x = count top + count right + count bottom + count left
-           where count f = if f x then 1 else 0
+countLines x = sum [ 1 | True <- [ top x, right x, bottom x, left x]]
 
 flListAll :: [FourLines]
 flListAll = [FourLines t r b l | t <- [False, True]
@@ -82,10 +81,7 @@ flListForConstraint Unconstrained = flListAll
 flListForConstraint (Exactly n) = filter ((==n) . countLines) flListAll
 
 flListXing :: [FourLines]
-flListXing = filter (zeroOrTwo.countLines) flListAll
-    where zeroOrTwo 0 = True
-          zeroOrTwo 2 = True
-          zeroOrTwo _ = False
+flListXing = filter (\fl -> countLines fl `elem` [0, 2]) flListAll
 
 data CellState = Line [Bool]
                | Space [FourLines] (Maybe Constraint) deriving (Eq, Show)
@@ -143,10 +139,10 @@ narrow seed state = if Set.null seed then [state] else
                     then narrow (Set.union seed' newSeeds) (State (sCells state // [(i, Line ls')]) newLoops)
                     else []
       Space ss cst -> do
-        let ss' = filter ((matchl (r-1, c) state).top)
-                $ filter ((matchl (r, c+1) state).right)
-                $ filter ((matchl (r+1, c) state).bottom)
-                $ filter ((matchl (r, c-1) state).left) 
+        let ss' = filter ((matchl (r-1, c) state) . top)
+                $ filter ((matchl (r, c+1) state) . right)
+                $ filter ((matchl (r+1, c) state) . bottom)
+                $ filter ((matchl (r, c-1) state) . left) 
                 $ filter (match2 (r-1, c-1) state [(bottom, left), (right, top)])
                 $ filter (match2 (r-1, c+1) state [(bottom, right), (left, top)])
                 $ filter (match2 (r+1, c-1) state [(top, left), (right, bottom)])

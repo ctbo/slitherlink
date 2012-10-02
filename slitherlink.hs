@@ -148,6 +148,11 @@ allLineIndices state = lefts $ allIndices state
 allIndices :: State -> [Either LineIndex SpaceIndex]
 allIndices state = map indexType $ indices (sSpaces state)
 
+grid :: State -> [[Either LineIndex SpaceIndex]]
+grid state = [ [ indexType (r,c) | c <- [c0..cn] ] | r <- [r0 .. rn] ]
+  where ((r0, c0), (rn, cn)) = bounds (sSpaces state)
+
+
 type Seed = Set.Set (Either LineIndex SpaceIndex) 
 
 narrow :: Seed -> State -> [State]
@@ -255,12 +260,10 @@ zeroRemainingLines state = foldM zeroLine state (allLineIndices state) >>= narro
                    _ -> [state]
 
 showState :: State -> String
-showState (State spaces lines _) = unlines $ map oneLine [r0 .. rn]
-  where ((r0, c0), (rn, cn)) = bounds spaces
-        oneLine r = concat $ map (oneCell r) [c0 .. cn]
-        oneCell r c = case indexType (r,c) of
-            Left li -> showLine (vertical li) $ lines ! li
-            Right si -> showSpace $ spaces ! si
+showState state = unlines $ map oneLine (grid state)
+  where oneLine = concat . map oneCell
+        oneCell (Left li) = showLine (vertical li) $ sLines state ! li
+        oneCell (Right si) = showSpace $ sSpaces state ! si
         showLine vertical (Line [True])        = if vertical then "|" else "-"
         showLine _        (Line [False])       = " "
         showLine _        (Line _)             = "?"

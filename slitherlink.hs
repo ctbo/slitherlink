@@ -161,7 +161,7 @@ matchl i (State cells _) x =
     where check (Line ls) = x `elem` ls
           check _ = undefined -- can't happen
 
-match2 :: (Int, Int) -> State -> [(FourLines->Bool, FourLines->Bool)] -> FourLines -> Bool
+match2 :: Index -> State -> [(FourLines->Bool, FourLines->Bool)] -> FourLines -> Bool
 match2 i (State cells _) fps thiscell = (not (inRange (bounds cells) i)) || any ok otherlist
     where Space otherlist _ = cells!i
           ok othercell = all pairmatch fps

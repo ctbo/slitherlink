@@ -102,23 +102,22 @@ stateFromProblem p =
         columns = 2*cn + 2
         spaces = [((r, c), Space flXing Nothing) | r <- [0, 2 .. 2*rn+2], c <- [0, 2 .. 2*cn+2]]
              ++ [((2*r+1, 2*c+1), Space (flConstraint cst) (Just cst))| r <- [0 .. rn], c <- [0 .. cn], let cst=p!(r, c)]
-
         lines = [((r, c), Line [False, True]) | r <- [0, 2 .. 2*rn+2], c <- [1, 3 .. 2*cn+1]]
              ++ [((r, c), Line [False, True]) | r <- [1, 3 .. 2*rn+1], c <- [0, 2 .. 2*cn+2]]
 
 type Direction = (Int, Int)
 directions4 :: [Direction] -- right, down, left, up
 directions4 = [(0, 1), (1, 0), (0, -1), (-1, 0)]
-diagonals4 :: [Direction]
+diagonals4 :: [Direction] -- right down, down left, left up, up right
 diagonals4 = [(1, 1), (1, -1), (-1, -1), (-1, 1)]
-directions8 :: [Direction] -- right down, down left, left up, up right
+directions8 :: [Direction]
 directions8 = directions4 ++ diagonals4
 
 (.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
 (a, b) .+ (c, d) = (a+c, b+d)
 
 indexType :: Index -> Either LineIndex SpaceIndex
-indexType (r,c) = if even r == even c then Right (r,c) else Left (r,c)
+indexType (r, c) = if even r == even c then Right (r, c) else Left (r, c)
 
 lineNeighbors :: LineIndex -> [Either LineIndex SpaceIndex]
 lineNeighbors i = map indexType $ map (i .+) directions4
@@ -136,14 +135,14 @@ spaceNeighbors :: SpaceIndex -> [Either LineIndex SpaceIndex]
 spaceNeighbors i = map indexType $ map (i .+) directions8
 
 vertical :: LineIndex -> Bool
-vertical (r,c) = odd r
+vertical (r, _) = odd r
 
-cornersAtLine :: LineIndex -> (SpaceIndex, SpaceIndex)
-cornersAtLine i = if vertical i then (i .+ (-1, 0), i .+ (1, 0))
-                                else (i .+ (0, -1), i .+ (0, 1))
+dotsAtLine :: LineIndex -> (SpaceIndex, SpaceIndex)
+dotsAtLine i = if vertical i then (i .+ (-1, 0), i .+ (1, 0))
+                             else (i .+ (0, -1), i .+ (0, 1))
                                 
-allCornerIndices :: State -> [SpaceIndex]
-allCornerIndices state = [(r, c) | r <- [0, 2 .. rn], c <- [0, 2 .. cn]]
+allDotIndices :: State -> [SpaceIndex]
+allDotIndices state = [(r, c) | r <- [0, 2 .. rn], c <- [0, 2 .. cn]]
     where ((0, 0), (rn, cn)) = bounds (sSpaces state)
 
 allLineIndices :: State -> [LineIndex]
@@ -155,7 +154,6 @@ allIndices state = map indexType $ indices (sSpaces state)
 grid :: State -> [[Either LineIndex SpaceIndex]]
 grid state = [ [ indexType (r,c) | c <- [c0..cn] ] | r <- [r0 .. rn] ]
   where ((r0, c0), (rn, cn)) = bounds (sSpaces state)
-
 
 type Seed = Set.Set (Either LineIndex SpaceIndex) 
 
@@ -172,27 +170,27 @@ narrow seed state = if Set.null seed then [state] else
             else narrowSpace si seed' state
 
 narrowLine :: LineIndex -> Seed -> State -> [State]
-narrowLine i seed' state = 
+narrowLine i seed state = 
     case (sLines state)!i of
       Line ls -> do
         let ls' = filter (\b -> all (\(si, lineThere) -> match si state lineThere b) $
                             zip (spacesAtLine i)  [left, top, right, bottom]) ls
         if null ls' 
           then [] 
-          else if ls' == ls 
-            then narrow seed' state 
+          else if ls == ls 
+            then narrow seed state 
             else let newSeeds = Set.fromList $ lineNeighbors i
                      newLoops = if ls' == [True]
-                                then addSegment (cornersAtLine i) (sLoops state)
+                                then addSegment (dotsAtLine i) (sLoops state)
                                 else sLoops state
                  in if newLoops /= Invalid
-                    then narrow (Set.union seed' newSeeds) $
+                    then narrow (Set.union seed newSeeds) $
                         state { sLines = sLines state // [(i, Line ls')],
                                 sLoops = newLoops}
                     else []
 
 narrowSpace :: SpaceIndex -> Seed -> State -> [State]
-narrowSpace i seed' state = 
+narrowSpace i seed state = 
     case (sSpaces state)!i of
       Space ss cst -> do
         let ss' = filter (\x -> all (\(li, lineThere) -> matchl li state lineThere) $
@@ -206,9 +204,9 @@ narrowSpace i seed' state =
         if null ss'
           then []
           else if ss' == ss
-            then narrow seed' state
+            then narrow seed state
             else let newSeeds = Set.fromList $ spaceNeighbors i
-                 in narrow (Set.union seed' newSeeds) $
+                 in narrow (Set.union seed newSeeds) $
                     state { sSpaces = sSpaces state // [(i, Space ss' cst)] }
 
 match :: SpaceIndex -> State -> (FourLines -> Bool) -> Bool -> Bool
@@ -249,7 +247,7 @@ solve' depth state =
                      else continueAt $ head $ Map.keys p
          OneLoop -> zeroRemainingLines state
          Invalid -> []
-    where evenGrid = allCornerIndices state
+    where evenGrid = allDotIndices state
           undecided i = undecided' (sSpaces state ! i)
           undecided' (Space (_:_:_) _) = True -- list has at least 2 elements
           undecided' _ = False 

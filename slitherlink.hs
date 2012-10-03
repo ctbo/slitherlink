@@ -177,7 +177,7 @@ narrowLine i seed state =
                             zip (spacesAtLine i)  [left, top, right, bottom]) ls
         if null ls' 
           then [] 
-          else if ls == ls 
+          else if ls' == ls 
             then narrow seed state 
             else let newSeeds = Set.fromList $ lineNeighbors i
                      newLoops = if ls' == [True]

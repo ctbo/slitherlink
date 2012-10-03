@@ -221,7 +221,7 @@ matchl i state x =
        else x == False -- no lines allowed outside grid
     where check (Line ls) = x `elem` ls
 
-match2 :: (Int, Int) -> State -> [(FourLines -> Bool, FourLines -> Bool)] -> FourLines -> Bool
+match2 :: SpaceIndex -> State -> [(FourLines -> Bool, FourLines -> Bool)] -> FourLines -> Bool
 match2 i state fps thiscell = (not (inRange (bounds (sSpaces state)) i)) || any ok otherlist
     where Space otherlist _ = sSpaces state ! i
           ok othercell = all pairmatch fps

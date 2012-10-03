@@ -1,6 +1,7 @@
 -- slitherlink.hs 
 -- a solver for Slitherlink puzzles
 -- Copyright (C) 2012 by Harald Bögeholz
+-- with contributions from Joachim Breitner
 -- See LICENSE file for license information
 
 import Data.Array.IArray

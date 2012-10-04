@@ -31,13 +31,20 @@ initialSeeds i = Set.fromList $ map (makeSeed i) directions4
 inGrid :: State -> Seed -> Bool
 inGrid state ((r, c), _) = r >= 0 && r < sRows state && c >= 0 && c < sColumns state
 
+deletePickRandom :: Ord a => Set.Set a -> StdGen -> (a, Set.Set a, StdGen)
+deletePickRandom s gen = (e, set', gen')
+    where l = Set.toList s
+          (r, gen') = randomR (0, length l - 1) gen
+          e = l !! r
+          set' = Set.delete e s
+
 addSquare :: State -> StdGen -> (State, StdGen)
 addSquare state gen
   | Set.null (sSeeds state) = (state, gen)
   | otherwise = if Set.null $ Set.intersection (sIn state) (Set.fromList (forward6 i d))
-                   then addSquare state { sIn = in', sSeeds = seeds'' } gen
-                   else addSquare state { sSeeds = seeds' } gen
-      where ((i, d), seeds') = Set.deleteFindMin (sSeeds state)
+                   then addSquare state { sIn = in', sSeeds = seeds'' } gen'
+                   else addSquare state { sSeeds = seeds' } gen'
+      where ((i, d), seeds', gen') = deletePickRandom (sSeeds state) gen
             newSeeds = Set.fromList $ filter (inGrid state) $ map (makeSeed i) [d, turnLeft d, turnRight d]
             seeds'' = Set.union seeds' newSeeds
             in' = Set.insert i (sIn state)

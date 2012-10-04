@@ -64,3 +64,10 @@ showState state = concatMap showLine [0 .. sRows state - 1]
 generate :: Int -> Int -> StdGen -> (State, StdGen)
 generate nr nc gen = addSquare init gen'
     where (init, gen') = initialState nr nc gen
+
+showStateN :: State -> String
+showStateN state = concatMap showLine [0 .. sRows state - 1]
+    where showLine r = concatMap (showCell r) [0 .. sColumns state - 1] ++ "\n"
+          showCell r c = show $ countLines (r, c)
+          countLines i = let this = i `Set.member` sIn state
+                         in length $ filter (\d -> this /= i.+d `Set.member` sIn state) directions4

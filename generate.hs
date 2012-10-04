@@ -25,11 +25,8 @@ forward6 i d = [ i,      i .+ turnLeft d,      i .+ turnRight d
 makeSeed :: Index -> Direction -> Seed
 makeSeed i d = (i .+ d, d)
 
-initialSeeds :: Index -> Set.Set Seed
-initialSeeds i = Set.fromList $ map (makeSeed i) directions4
-
-inGrid :: State -> Seed -> Bool
-inGrid state ((r, c), _) = r >= 0 && r < sRows state && c >= 0 && c < sColumns state
+inGrid :: Int -> Int -> Seed -> Bool
+inGrid nr nc ((r, c), _) = r >= 0 && r < nr && c >= 0 && c < nc
 
 deletePickRandom :: Ord a => Set.Set a -> StdGen -> (a, Set.Set a, StdGen)
 deletePickRandom s gen = (e, set', gen')
@@ -45,10 +42,17 @@ addSquare state gen
                    then addSquare state { sIn = in', sSeeds = seeds'' } gen'
                    else addSquare state { sSeeds = seeds' } gen'
       where ((i, d), seeds', gen') = deletePickRandom (sSeeds state) gen
-            newSeeds = Set.fromList $ filter (inGrid state) $ map (makeSeed i) [d, turnLeft d, turnRight d]
+            newSeeds = Set.fromList $ filter (inGrid (sRows state) (sColumns state)) 
+                                    $ map (makeSeed i) [d, turnLeft d, turnRight d]
             seeds'' = Set.union seeds' newSeeds
             in' = Set.insert i (sIn state)
 
 initialState :: Int -> Int -> Index -> State
-initialState r c i = State { sRows = r, sColumns = c, sIn = Set.singleton i
-                           , sSeeds = initialSeeds i }
+initialState nr nc i = State { sRows = nr, sColumns = nc, sIn = Set.singleton i
+                             , sSeeds = initialSeeds }
+  where initialSeeds = Set.fromList $ filter (inGrid nr nc) $ map (makeSeed i) directions4
+
+showState :: State -> String
+showState state = concatMap showLine [0 .. sRows state - 1]
+    where showLine r = concatMap (showCell r) [0 .. sColumns state - 1] ++ "\n"
+          showCell r c = if (r, c) `Set.member` sIn state then "X" else " "

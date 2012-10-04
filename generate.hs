@@ -47,12 +47,20 @@ addSquare state gen
             seeds'' = Set.union seeds' newSeeds
             in' = Set.insert i (sIn state)
 
-initialState :: Int -> Int -> Index -> State
-initialState nr nc i = State { sRows = nr, sColumns = nc, sIn = Set.singleton i
-                             , sSeeds = initialSeeds }
-  where initialSeeds = Set.fromList $ filter (inGrid nr nc) $ map (makeSeed i) directions4
+initialState :: Int -> Int -> StdGen -> (State, StdGen)
+initialState nr nc gen = ( State { sRows = nr, sColumns = nc, sIn = Set.singleton i
+                                 , sSeeds = initialSeeds }
+                         , gen'' )
+  where (r, gen') = randomR (0, nr - 1) gen
+        (c, gen'') = randomR (0, nc - 1) gen'
+        i = (r, c)
+        initialSeeds = Set.fromList $ filter (inGrid nr nc) $ map (makeSeed i) directions4
 
 showState :: State -> String
 showState state = concatMap showLine [0 .. sRows state - 1]
     where showLine r = concatMap (showCell r) [0 .. sColumns state - 1] ++ "\n"
           showCell r c = if (r, c) `Set.member` sIn state then "X" else " "
+
+generate :: Int -> Int -> StdGen -> (State, StdGen)
+generate nr nc gen = addSquare init gen'
+    where (init, gen') = initialState nr nc gen

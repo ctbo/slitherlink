@@ -1,3 +1,8 @@
+-- generate.hs 
+-- a generator for Slitherlink puzzles
+-- Copyright (C) 2012 by Harald Bögeholz
+-- See LICENSE file for license information
+
 import qualified Data.Set as Set
 import System.Random
 

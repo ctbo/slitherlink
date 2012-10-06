@@ -9,10 +9,10 @@ import System.Random
 type Index = (Int, Int)
 type Direction = (Int, Int)
 type Seed = (Index, Direction)
-data State = State { sRows :: Int
-                   , sColumns :: Int
-                   , sIn :: Set.Set Index
-                   , sSeeds :: Set.Set Seed } deriving Show
+data Inside = Inside { sRows :: Int
+                     , sColumns :: Int
+                     , sIn :: Set.Set Index
+                     , sSeeds :: Set.Set Seed } deriving Show
 
 directions4 :: [Direction] -- right, down, left, up
 directions4 = [(0, 1), (1, 0), (0, -1), (-1, 0)]
@@ -40,7 +40,7 @@ deletePickRandom s gen = (e, set', gen')
           e = l !! r
           set' = Set.delete e s
 
-addSquare :: State -> StdGen -> (State, StdGen)
+addSquare :: Inside -> StdGen -> (Inside, StdGen)
 addSquare state gen
   | Set.null (sSeeds state) = (state, gen)
   | otherwise = if Set.null $ Set.intersection (sIn state) (Set.fromList (forward6 i d))
@@ -52,8 +52,8 @@ addSquare state gen
             seeds'' = Set.union seeds' newSeeds
             in' = Set.insert i (sIn state)
 
-initialState :: Int -> Int -> StdGen -> (State, StdGen)
-initialState nr nc gen = ( State { sRows = nr, sColumns = nc, sIn = Set.singleton i
+initialInside :: Int -> Int -> StdGen -> (Inside, StdGen)
+initialInside nr nc gen = ( Inside { sRows = nr, sColumns = nc, sIn = Set.singleton i
                                  , sSeeds = initialSeeds }
                          , gen'' )
   where (r, gen') = randomR (0, nr - 1) gen
@@ -61,17 +61,17 @@ initialState nr nc gen = ( State { sRows = nr, sColumns = nc, sIn = Set.singleto
         i = (r, c)
         initialSeeds = Set.fromList $ filter (inGrid nr nc) $ map (makeSeed i) directions4
 
-showState :: State -> String
-showState state = concatMap showLine [0 .. sRows state - 1]
+showInside :: Inside -> String
+showInside state = concatMap showLine [0 .. sRows state - 1]
     where showLine r = concatMap (showCell r) [0 .. sColumns state - 1] ++ "\n"
           showCell r c = if (r, c) `Set.member` sIn state then "X" else " "
 
-generate :: Int -> Int -> StdGen -> (State, StdGen)
+generate :: Int -> Int -> StdGen -> (Inside, StdGen)
 generate nr nc gen = addSquare init gen'
-    where (init, gen') = initialState nr nc gen
+    where (init, gen') = initialInside nr nc gen
 
-showStateN :: State -> String
-showStateN state = concatMap showLine [0 .. sRows state - 1]
+showInsideN :: Inside -> String
+showInsideN state = concatMap showLine [0 .. sRows state - 1]
     where showLine r = concatMap (showCell r) [0 .. sColumns state - 1] ++ "\n"
           showCell r c = show $ countLines (r, c)
           countLines i = let this = i `Set.member` sIn state

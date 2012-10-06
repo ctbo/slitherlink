@@ -4,6 +4,7 @@
 -- See LICENSE file for license information
 
 import qualified Data.Set as Set
+import System.Environment
 import System.Random
 
 type Index = (Int, Int)
@@ -20,7 +21,10 @@ directions4 = [(0, 1), (1, 0), (0, -1), (-1, 0)]
 (.+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
 (a, b) .+ (c, d) = (a+c, b+d)
 
+turnLeft :: (Int, Int) -> (Int, Int)
 turnLeft (a, b) = (-b, a)
+
+turnRight :: (Int, Int) -> (Int, Int)
 turnRight (a, b) = (b, -a)
 
 forward6 :: Index -> Direction -> [Index]
@@ -67,8 +71,8 @@ showInside state = concatMap showLine [0 .. sRows state - 1]
           showCell r c = if (r, c) `Set.member` sIn state then "X" else " "
 
 generate :: Int -> Int -> StdGen -> (Inside, StdGen)
-generate nr nc gen = addSquare init gen'
-    where (init, gen') = initialInside nr nc gen
+generate nr nc gen = addSquare initial gen'
+    where (initial, gen') = initialInside nr nc gen
 
 showInsideN :: Inside -> String
 showInsideN state = concatMap showLine [0 .. sRows state - 1]
@@ -76,3 +80,12 @@ showInsideN state = concatMap showLine [0 .. sRows state - 1]
           showCell r c = show $ countLines (r, c)
           countLines i = let this = i `Set.member` sIn state
                          in length $ filter (\d -> this /= i.+d `Set.member` sIn state) directions4
+
+main :: IO ()
+main = do
+     args <- getArgs
+     case args of
+          [nr, nc] -> do
+               gen <- newStdGen
+               putStr $ showInside $ fst $ generate (read nr) (read nc) gen
+          _ -> error "usage: generate rows columns"

@@ -3,9 +3,13 @@
 -- Copyright (C) 2012 by Harald Bögeholz
 -- See LICENSE file for license information
 
+import Slitherlink
 import qualified Data.Set as Set
 import System.Environment
 import System.Random
+import Data.List (nub)
+import Data.Array.IArray
+
 
 type Index = (Int, Int)
 type Direction = (Int, Int)
@@ -65,6 +69,13 @@ initialInside nr nc gen = ( Inside { sRows = nr, sColumns = nc, sIn = Set.single
         i = (r, c)
         initialSeeds = Set.fromList $ filter (inGrid nr nc) $ map (makeSeed i) directions4
 
+randomPermutation :: [a] -> StdGen -> [a]
+randomPermutation xs gen = map (xs!!) $ take l $ nub $ randomRs (0, l-1) gen
+    where l = length xs
+
+grid :: Int -> Int -> [Index]
+grid nr nc = [(r, c) | r <- [0 .. nr-1], c <- [0 .. nc-1]]
+
 showInside :: Inside -> String
 showInside state = concatMap showLine [0 .. sRows state - 1]
     where showLine r = concatMap (showCell r) [0 .. sColumns state - 1] ++ "\n"
@@ -80,6 +91,13 @@ showInsideN state = concatMap showLine [0 .. sRows state - 1]
           showCell r c = show $ countLines (r, c)
           countLines i = let this = i `Set.member` sIn state
                          in length $ filter (\d -> this /= i.+d `Set.member` sIn state) directions4
+
+makeProblem :: Inside -> [Index] -> Problem
+makeProblem ins is = listArray ((0, 0), (sRows ins - 1, sColumns ins - 1)) (repeat Unconstrained)
+                  // map constraint is
+    where constraint i = (i, Exactly (countLines i))
+          countLines i = let this = i `Set.member`sIn ins
+                         in length $ filter (\d -> this /= i.+d `Set.member` sIn ins) directions4
 
 main :: IO ()
 main = do

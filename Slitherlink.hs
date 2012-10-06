@@ -3,7 +3,7 @@
 -- Copyright (C) 2012 by Harald Bögeholz
 -- See LICENSE file for license information
 
-module Slitherlink (Problem, readProblem, showState, solve) where
+module Slitherlink (Problem, Constraint(..), readProblem, showState, solve) where
 
 import Data.Array.IArray
 import Control.Monad

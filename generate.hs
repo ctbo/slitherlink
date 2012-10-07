@@ -92,21 +92,20 @@ grid :: Int -> Int -> [Index]
 grid nr nc = [(r, c) | r <- [0 .. nr-1], c <- [0 .. nc-1]]
 
 generate :: Int -> Int -> StdGen -> Problem
-generate nr nc gen = binsearch 0 $ length perm
+generate nr nc gen = foldl remove problem perm
     where (initial, gen') = initialInside nr nc gen
           (inside, gen'') = addSquare initial gen'
           perm = randomPermutation (grid nr nc) gen''
-          binsearch lower upper
-             | lower == upper = makeProblem inside (take lower perm)
-             | otherwise = let mid = (lower + upper) `div` 2
-                           in if uniqueSolution mid
-                                 then binsearch lower mid
-                                 else binsearch (mid+1) upper
-          uniqueSolution n = trace (show n) $ 1 == (length $ take 2 $ solve $ makeProblem inside (take n perm))
+          problem = makeProblem inside
+          remove p i = let p' = p // [(i, Unconstrained)]
+                       in if uniqueSolution p'
+                          then p'
+                          else p
+          uniqueSolution p = 1 == (length $ take 2 $ solve p)
 
-makeProblem :: Inside -> [Index] -> Problem
-makeProblem ins is = listArray ((0, 0), (sRows ins - 1, sColumns ins - 1)) (repeat Unconstrained)
-                  // map constraint is
+makeProblem :: Inside -> Problem
+makeProblem ins = array ((0, 0), (sRows ins - 1, sColumns ins - 1)) 
+                $ map constraint $ grid (sRows ins) (sColumns ins)
     where constraint i = (i, Exactly (countLines i))
           countLines i = let this = i `Set.member`sIn ins
                          in length $ filter (\d -> this /= i.+d `Set.member` sIn ins) directions4

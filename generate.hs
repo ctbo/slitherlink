@@ -9,6 +9,7 @@ import System.Environment
 import System.Random
 import Data.List (nub)
 import Data.Array.IArray
+import Debug.Trace
 
 
 type Index = (Int, Int)
@@ -69,21 +70,11 @@ initialInside nr nc gen = ( Inside { sRows = nr, sColumns = nc, sIn = Set.single
         i = (r, c)
         initialSeeds = Set.fromList $ filter (inGrid nr nc) $ map (makeSeed i) directions4
 
-randomPermutation :: [a] -> StdGen -> [a]
-randomPermutation xs gen = map (xs!!) $ take l $ nub $ randomRs (0, l-1) gen
-    where l = length xs
-
-grid :: Int -> Int -> [Index]
-grid nr nc = [(r, c) | r <- [0 .. nr-1], c <- [0 .. nc-1]]
-
+{-
 showInside :: Inside -> String
 showInside state = concatMap showLine [0 .. sRows state - 1]
     where showLine r = concatMap (showCell r) [0 .. sColumns state - 1] ++ "\n"
           showCell r c = if (r, c) `Set.member` sIn state then "X" else " "
-
-generate :: Int -> Int -> StdGen -> (Inside, StdGen)
-generate nr nc gen = addSquare initial gen'
-    where (initial, gen') = initialInside nr nc gen
 
 showInsideN :: Inside -> String
 showInsideN state = concatMap showLine [0 .. sRows state - 1]
@@ -91,6 +82,27 @@ showInsideN state = concatMap showLine [0 .. sRows state - 1]
           showCell r c = show $ countLines (r, c)
           countLines i = let this = i `Set.member` sIn state
                          in length $ filter (\d -> this /= i.+d `Set.member` sIn state) directions4
+-}
+
+randomPermutation :: [a] -> StdGen -> [a]
+randomPermutation xs gen = map (xs!!) $ take l $ nub $ randomRs (0, l-1) gen
+    where l = length xs
+
+grid :: Int -> Int -> [Index]
+grid nr nc = [(r, c) | r <- [0 .. nr-1], c <- [0 .. nc-1]]
+
+generate :: Int -> Int -> StdGen -> Problem
+generate nr nc gen = binsearch 0 $ length perm
+    where (initial, gen') = initialInside nr nc gen
+          (inside, gen'') = addSquare initial gen'
+          perm = randomPermutation (grid nr nc) gen''
+          binsearch lower upper
+             | lower == upper = makeProblem inside (take lower perm)
+             | otherwise = let mid = (lower + upper) `div` 2
+                           in if uniqueSolution mid
+                                 then binsearch lower mid
+                                 else binsearch (mid+1) upper
+          uniqueSolution n = trace (show n) $ 1 == (length $ take 2 $ solve $ makeProblem inside (take n perm))
 
 makeProblem :: Inside -> [Index] -> Problem
 makeProblem ins is = listArray ((0, 0), (sRows ins - 1, sColumns ins - 1)) (repeat Unconstrained)
@@ -99,11 +111,17 @@ makeProblem ins is = listArray ((0, 0), (sRows ins - 1, sColumns ins - 1)) (repe
           countLines i = let this = i `Set.member`sIn ins
                          in length $ filter (\d -> this /= i.+d `Set.member` sIn ins) directions4
 
+showProblem :: Problem -> String
+showProblem p = unlines $ map oneLine [0 .. rn]
+    where ((0, 0), (rn, cn)) = bounds p
+          oneLine r = concatMap (\c -> show (p!(r, c))) [0 .. cn]
+
 main :: IO ()
 main = do
      args <- getArgs
      case args of
           [nr, nc] -> do
                gen <- newStdGen
-               putStr $ showInside $ fst $ generate (read nr) (read nc) gen
+               let problem = generate (read nr) (read nc) gen
+               putStr $ showProblem problem               
           _ -> error "usage: generate rows columns"

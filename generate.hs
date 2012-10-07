@@ -92,22 +92,22 @@ grid :: Int -> Int -> [Index]
 grid nr nc = [(r, c) | r <- [0 .. nr-1], c <- [0 .. nc-1]]
 
 generate :: Int -> Int -> StdGen -> Problem
-generate nr nc gen = foldl remove problem perm
+generate nr nc gen = foldl remove problem $ zip perm [length perm, length perm - 1 .. 1]
     where (initial, gen') = initialInside nr nc gen
           (inside, gen'') = addSquare initial gen'
           perm = randomPermutation (grid nr nc) gen''
           problem = makeProblem inside
-          remove p i = let p' = p // [(i, Unconstrained)]
-                       in if uniqueSolution p'
-                          then p'
-                          else p
+          remove p (i, t) = let p' = p // [(i, Unconstrained)]
+                            in if uniqueSolution p'
+                                  then trace ("+ " ++ show t) p'
+                                  else trace ("- " ++ show t) p
           uniqueSolution p = 1 == (length $ take 2 $ solve p)
 
 makeProblem :: Inside -> Problem
 makeProblem ins = array ((0, 0), (sRows ins - 1, sColumns ins - 1)) 
                 $ map constraint $ grid (sRows ins) (sColumns ins)
     where constraint i = (i, Exactly (countLines i))
-          countLines i = let this = i `Set.member`sIn ins
+          countLines i = let this = i `Set.member` sIn ins
                          in length $ filter (\d -> this /= i.+d `Set.member` sIn ins) directions4
 
 showProblem :: Problem -> String

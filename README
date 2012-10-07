@@ -1,9 +1,11 @@
-slitherlink.hs -- (c) 2012 by Harald Bögeholz
+slitherlink -- (c) 2012 by Harald Bögeholz
 
-This is a solver for Slitherlink puzzles written in Haskell.
+Solver and generator for slitherlink puzzles written in Haskell.
+This is open source software under a BSD license, see LICENSE.
 
-I am a Haskell newbie and this is my first attempt at a serious
-program in Haskell, so I appreciate any suggestions for improvement.
+Slitherlink.hs: the solver module
+solve.hs      : a main program to solve a puzzle
+generate.hs   : a main program to generate a puzzle with a unique solution
 
 
 Harald Bögeholz

@@ -99,7 +99,7 @@ generate nr nc gen = foldl remove problem $ zip perm [length perm, length perm -
           problem = makeProblem inside
           remove p (i, t) = let p' = p // [(i, Unconstrained)]
                             in if uniqueSolution p'
-                                  then trace ("+ " ++ show t) p'
+                                  then trace (showProblem p' ++ "+ " ++ show t) p'
                                   else trace ("- " ++ show t) p
           uniqueSolution p = 1 == (length $ take 2 $ solve p)
 

@@ -151,22 +151,21 @@ narrow seed state = if Set.null seed then [state] else
                            (State (sCells state // [(i, Space ss' cst)]) (sLoops state))
 
 matchSL :: State -> Index -> (FourLines -> Bool) -> Bool -> Bool
-matchSL (State cells _) i f x = (not (inRange (bounds cells) i)) 
-                           || check (cells!i)
+matchSL (State cells _) i f x = (not (inRange (bounds cells) i)) || check (cells!i)
     where check (Space xs _) = any ((==x).f) xs
-          check _ = undefined -- can't happen
+          check _            = undefined -- can't happen
 
 matchLS :: State -> Index -> (FourLines -> Bool) -> FourLines -> Bool
-matchLS (State cells _) i f x = 
-    if inRange (bounds cells) i
-       then check (cells!i)
-       else not (f x) -- no lines allowed outside grid
+matchLS (State cells _) i f x = if inRange (bounds cells) i
+                                   then check (cells!i)
+                                   else not (f x) -- no lines allowed outside grid
     where check (Line ls) = f x `elem` ls
-          check _ = undefined -- can't happen
+          check _         = undefined -- can't happen
 
 matchSS :: State -> Index -> [(FourLines->Bool, FourLines->Bool)] -> FourLines -> Bool
-matchSS (State cells _) i fps thiscell = (not (inRange (bounds cells) i)) || any ok otherlist
-    where Space otherlist _ = cells!i
+matchSS (State cells _) i fps thiscell = (not (inRange (bounds cells) i)) || check (cells!i)
+    where check (Space otherlist _) = any ok otherlist
+          check _                   = undefined -- can't happen
           ok othercell = all pairmatch fps
               where pairmatch (otherf, thisf) = thisf thiscell == otherf othercell
 

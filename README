@@ -7,6 +7,18 @@ Slitherlink.hs: the solver module
 solve.hs      : a main program to solve a puzzle
 generate.hs   : a main program to generate a puzzle with a unique solution
 
+Compile with
+
+   ghc -O2 -Wall -threaded --make solve.hs
+   ghc -O2 -Wall -threaded --make generate.hs
+
+and use command line options like `+RTS -N4` to run on 4 cores.
+
+Examples:
+
+./solve test20x14 +RTS -N4
+./generate 12 12 +RTS -N4
+
 
 Harald Bögeholz
 bo@ct.de

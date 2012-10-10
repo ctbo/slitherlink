@@ -114,10 +114,10 @@ narrow seed state = if Set.null seed then [state] else
       if not (inRange (bounds (sCells state)) i) then narrow seed' state else
     case (sCells state)!i of
       Line ls -> do
-        let ls' = filter (match (r-1, c) state bottom)
-                $ filter (match (r, c+1) state left)
-                $ filter (match (r+1, c) state top)
-                $ filter (match (r, c-1) state right) ls
+        let ls' = filter (matchSL state (r-1, c) bottom)
+                $ filter (matchSL state (r, c+1) left)
+                $ filter (matchSL state (r+1, c) top)
+                $ filter (matchSL state (r, c-1) right) ls
         if null ls' 
           then [] 
           else if ls' == ls 
@@ -129,41 +129,43 @@ narrow seed state = if Set.null seed then [state] else
                                      else addSegment (r, c-1) (r, c+1) (sLoops state)
                                 else sLoops state
                  in if newLoops /= Invalid
-                    then narrow (Set.union seed' newSeeds) (State (sCells state // [(i, Line ls')]) newLoops)
+                    then narrow (Set.union seed' newSeeds) 
+                                (State (sCells state // [(i, Line ls')]) newLoops)
                     else []
       Space ss cst -> do
-        let ss' = filter ((matchl (r-1, c) state) . top)
-                $ filter ((matchl (r, c+1) state) . right)
-                $ filter ((matchl (r+1, c) state) . bottom)
-                $ filter ((matchl (r, c-1) state) . left) 
-                $ filter (match2 (r-1, c-1) state [(bottom, left), (right, top)])
-                $ filter (match2 (r-1, c+1) state [(bottom, right), (left, top)])
-                $ filter (match2 (r+1, c-1) state [(top, left), (right, bottom)])
-                $ filter (match2 (r+1, c+1) state [(top, right), (left, bottom)]) 
+        let ss' = filter (matchLS state (r-1, c) top)
+                $ filter (matchLS state (r, c+1) right)
+                $ filter (matchLS state (r+1, c) bottom)
+                $ filter (matchLS state (r, c-1) left) 
+                $ filter (matchSS state (r-1, c-1) [(bottom, left), (right, top)])
+                $ filter (matchSS state (r-1, c+1) [(bottom, right), (left, top)])
+                $ filter (matchSS state (r+1, c-1) [(top, left), (right, bottom)])
+                $ filter (matchSS state (r+1, c+1) [(top, right), (left, bottom)]) 
                 ss
         if null ss'
           then []
           else if ss' == ss
             then narrow seed' state
             else let newSeeds = Set.fromList $ map (i .+) directions8
-                 in narrow (Set.union seed' newSeeds) (State (sCells state // [(i, Space ss' cst)]) (sLoops state))
+                 in narrow (Set.union seed' newSeeds) 
+                           (State (sCells state // [(i, Space ss' cst)]) (sLoops state))
 
-match :: Index -> State -> (FourLines -> Bool) -> Bool -> Bool
-match i (State cells _) f x = (not (inRange (bounds cells) i)) 
+matchSL :: State -> Index -> (FourLines -> Bool) -> Bool -> Bool
+matchSL (State cells _) i f x = (not (inRange (bounds cells) i)) 
                            || check (cells!i)
     where check (Space xs _) = any ((==x).f) xs
           check _ = undefined -- can't happen
 
-matchl :: Index -> State -> Bool -> Bool
-matchl i (State cells _) x = 
+matchLS :: State -> Index -> (FourLines -> Bool) -> FourLines -> Bool
+matchLS (State cells _) i f x = 
     if inRange (bounds cells) i
        then check (cells!i)
-       else x == False -- no lines allowed outside grid
-    where check (Line ls) = x `elem` ls
+       else not (f x) -- no lines allowed outside grid
+    where check (Line ls) = f x `elem` ls
           check _ = undefined -- can't happen
 
-match2 :: Index -> State -> [(FourLines->Bool, FourLines->Bool)] -> FourLines -> Bool
-match2 i (State cells _) fps thiscell = (not (inRange (bounds cells) i)) || any ok otherlist
+matchSS :: State -> Index -> [(FourLines->Bool, FourLines->Bool)] -> FourLines -> Bool
+matchSS (State cells _) i fps thiscell = (not (inRange (bounds cells) i)) || any ok otherlist
     where Space otherlist _ = cells!i
           ok othercell = all pairmatch fps
               where pairmatch (otherf, thisf) = thisf thiscell == otherf othercell

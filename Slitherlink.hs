@@ -193,9 +193,9 @@ solve' depth state@(State cells loops) =
           undecided i = undecided' (cells!i)
           undecided' (Space (_:_:_) _) = True -- list has at least 2 elements
           undecided' _ = False 
-          continueAt i = concat $ parMap rseq fix list
+          continueAt i = concat $ parMap rseq pickOne list
             where (Space list cst) = cells!i
-                  fix ss = narrow neighbors (State (cells // [(i, Space [ss] cst)]) loops) >>= solve' (depth+1)
+                  pickOne ss = narrow neighbors (State (cells // [(i, Space [ss] cst)]) loops) >>= solve' (depth+1)
                   neighbors = Set.fromList $ map (i .+) directions8
 
 zeroRemainingLines :: State -> [State]

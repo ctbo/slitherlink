@@ -3,6 +3,9 @@ slitherlink -- (c) 2012 by Harald Bögeholz
 Solver and generator for slitherlink puzzles written in Haskell.
 This is open source software under a BSD license, see LICENSE.
 
+This program was used as an example in an article about Haskell in
+c't 23/2012, p. 182 (in German): http://www.heise.de/ct/inhalt/2012/23/182/
+
 Slitherlink.hs: the solver module
 solve.hs      : a main program to solve a puzzle
 generate.hs   : a main program to generate a puzzle with a unique solution
@@ -17,7 +20,7 @@ and use command line options like `+RTS -N4` to run on 4 cores.
 Examples:
 
 ./solve test20x14 +RTS -N4
-./generate 12 12 +RTS -N4
+./generate 12 12 puzzle.eps +RTS -N4
 
 
 Harald Bögeholz

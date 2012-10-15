@@ -110,22 +110,6 @@ makeProblem ins = array ((0, 0), (sRows ins - 1, sColumns ins - 1))
           countLines i = let this = i `Set.member` sIn ins
                          in length $ filter (\d -> this /= i.+d `Set.member` sIn ins) directions4
 
-showProblem :: Problem -> String
-showProblem p = unlines $ map oneLine [0 .. rn]
-    where ((0, 0), (rn, cn)) = bounds p
-          oneLine r = concatMap (\c -> show (p!(r, c))) [0 .. cn]
-
-showProblemEPS :: Problem -> String
-showProblemEPS p = epsStr1 ++ show ((cn+1)*22+4) ++ " " ++ show ((rn+1)*22+4) ++ "\n"
-                ++ "/nr " ++ show (rn+1) ++ " def\n"
-                ++ "/nc " ++ show (cn+1) ++ " def\n"
-                ++ epsStr2
-                ++ constraints
-    where ((0, 0), (rn, cn)) = bounds p
-          constraints = concatMap constraint $ assocs p
-          constraint (_, Unconstrained) = ""
-          constraint ((r, c), Exactly n) = "(" ++ show n ++ ") " ++ show r ++ " " ++ show c ++ " constraint\n"
-
 main :: IO ()
 main = do
      args <- getArgs
@@ -139,48 +123,3 @@ main = do
                putStr $ showProblem problem
                writeFile filename $ showProblemEPS problem               
           _ -> error "usage: generate rows columns [filename.eps]"
-
-
-epsStr1 :: String
-epsStr1 =
-    "%!PS-Adobe-3.0 EPSF-3.0\n\
-    \%%BoundingBox: 0 0 "
-
-epsStr2 :: String
-epsStr2 =
-    "/w 22 def\n\
-    \1 setlinewidth\n\
-    \.7 setgray\n\
-    \2 2 translate\n\
-    \0 0 moveto\n\
-    \nc w mul 0 lineto\n\
-    \nc w mul nr w mul lineto\n\
-    \0 nr w mul lineto\n\
-    \closepath\n\
-    \stroke\n\
-    \1 1 nc 1 sub % for\n\
-    \{\n\
-    \    w mul 0 moveto\n\
-    \    0 nr w mul rlineto\n\
-    \    stroke\n\
-    \} for\n\
-    \1 1 nr 1 sub % for\n\
-    \{\n\
-    \    w mul 0 exch moveto\n\
-    \    nc w mul 0 rlineto\n\
-    \    stroke\n\
-    \} for\n\
-    \0 1 nr % for\n\
-    \{\n\
-    \    0 1 nc % for\n\
-    \    {\n\
-    \        w mul 1 index w mul 1.5 0 360 arc closepath fill\n\
-    \    } for\n\
-    \    pop\n\
-    \} for\n\
-    \/Helvetica findfont 12 scalefont setfont\n\
-    \0 setgray\n\
-    \/constraint\n\
-    \{\n\
-    \    w mul 8 add exch nr exch sub 1 sub w mul 6.5 add moveto show\n\
-    \} def\n"

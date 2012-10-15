@@ -20,7 +20,7 @@ and use command line options like `+RTS -N4` to run on 4 cores.
 Examples:
 
 ./solve test20x14 +RTS -N4
-./generate 12 12 puzzle.eps +RTS -N4
+./generate 12 12 puzzle.eps solution.eps +RTS -N4
 
 
 Harald Bögeholz

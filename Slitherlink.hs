@@ -18,7 +18,7 @@ import Control.Monad.Instances()
 import Data.List (find)
 import qualified Data.Set as Set
 import qualified Data.Map as Map
-import Debug.Trace
+-- import Debug.Trace
 import Control.Parallel.Strategies
 
 data Constraint = Unconstrained | Exactly Int deriving (Eq)
@@ -207,15 +207,15 @@ solve' depth state@(State cells loops) =
 
 zeroRemainingLines :: State -> [State]
 zeroRemainingLines state = foldM zeroLine state (indices (sCells state)) >>= narrowAll
-    where zeroLine state@(State cells loops) i = case cells!i of
-                   Line [True] -> [state]
+    where zeroLine st@(State cells loops) i = case cells!i of
+                   Line [True] -> [st]
                    Line [False, True] -> [State (cells // [(i, Line [False])]) loops]
-                   _ -> [state]
+                   _ -> [st]
 
 showState :: State -> String
-showState (State cells _) = unlines $ map oneLine [r0 .. rn]
-  where ((r0, c0), (rn, cn)) = bounds cells
-        oneLine r = concat $ map (oneCell r) [c0 .. cn]
+showState (State cells _) = unlines $ map oneLine [0 .. rn]
+  where ((0, 0), (rn, cn)) = bounds cells
+        oneLine r = concat $ map (oneCell r) [0 .. cn]
         oneCell r c = showCell (odd r) $ cells!(r, c)
         showCell vertical (Line [True])        = if vertical then "|" else "-"
         showCell _        (Line [False])       = " "

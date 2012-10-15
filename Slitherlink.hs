@@ -3,8 +3,9 @@
 -- Copyright (C) 2012 by Harald Bögeholz
 -- See LICENSE file for license information
 
-module Slitherlink (Problem
+module Slitherlink ( Problem
                    , Constraint(..)
+                   , State
                    , readProblem
                    , solve
                    , showState

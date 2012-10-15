@@ -91,17 +91,17 @@ randomPermutation xs gen = map (xs!!) $ take l $ nub $ randomRs (0, l-1) gen
 grid :: Int -> Int -> [Index]
 grid nr nc = [(r, c) | r <- [0 .. nr-1], c <- [0 .. nc-1]]
 
-generate :: Int -> Int -> StdGen -> Problem
-generate nr nc gen = foldl remove problem $ zip perm [length perm, length perm - 1 .. 1]
+generate :: Int -> Int -> StdGen -> (Problem, State)
+generate nr nc gen = foldl remove (problem, head (solve problem)) $ zip perm [length perm, length perm - 1 .. 1]
     where (initial, gen') = initialInside nr nc gen
           (inside, gen'') = addSquare initial gen'
           perm = randomPermutation (grid nr nc) gen''
           problem = makeProblem inside
-          remove p (i, t) = let p' = p // [(i, Unconstrained)]
-                            in if uniqueSolution p'
-                                  then trace (showProblem p' ++ "+ " ++ show t) p'
-                                  else trace ("- " ++ show t) p
-          uniqueSolution p = 1 == (length $ take 2 $ solve p)
+          remove (p, s) (i, t) = let p' = p // [(i, Unconstrained)]
+                                 in case solve p' of
+                                    _:_:_ -> trace ("- " ++ show t) (p, s)
+                                    [s'] -> trace (showProblem p' ++ "+ " ++ show t) (p', s')
+                                    _ -> undefined -- no solution; shouldn't happen
 
 makeProblem :: Inside -> Problem
 makeProblem ins = array ((0, 0), (sRows ins - 1, sColumns ins - 1)) 
@@ -116,10 +116,15 @@ main = do
      gen <- newStdGen
      case args of
           [nr, nc] -> do
-               let problem = generate (read nr) (read nc) gen
+               let (problem, _) = generate (read nr) (read nc) gen
                putStr $ showProblem problem
           [nr, nc, filename] -> do
-               let problem = generate (read nr) (read nc) gen
+               let (problem, _) = generate (read nr) (read nc) gen
                putStr $ showProblem problem
-               writeFile filename $ showProblemEPS problem               
-          _ -> error "usage: generate rows columns [filename.eps]"
+               writeFile filename $ showProblemEPS problem         
+          [nr, nc, filename, filename2] -> do
+               let (problem, solution) = generate (read nr) (read nc) gen
+               putStr $ showProblem problem
+               writeFile filename $ showProblemEPS problem
+               writeFile filename2 $ showStateEPS solution
+          _ -> error "usage: generate rows columns [puzzle.eps] [solution.eps]"

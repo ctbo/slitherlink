@@ -266,49 +266,49 @@ epsStr1 =
 epsStr2 :: String
 epsStr2 =
     "\
-    \/w 22 def\
-    \1 setlinewidth\
-    \2 setlinecap\
-    \.7 setgray\
-    \2 2 translate\
-    \0 0 moveto\
-    \nc w mul 0 lineto\
-    \nc w mul nr w mul lineto\
-    \0 nr w mul lineto\
-    \closepath\
-    \stroke\
-    \1 1 nc 1 sub % for\
-    \{\
-    \    w mul 0 moveto\
-    \    0 nr w mul rlineto\
-    \    stroke\
-    \} for\
-    \1 1 nr 1 sub % for\
-    \{\
-    \    w mul 0 exch moveto\
-    \    nc w mul 0 rlineto\
-    \    stroke\
-    \} for\
-    \0 1 nr % for\
-    \{\
-    \    0 1 nc % for\
-    \    {\
-    \        w mul 1 index w mul 1.5 0 360 arc closepath fill\
-    \    } for\
-    \    pop\
-    \} for\
-    \/Helvetica findfont 12 scalefont setfont\
-    \1.5 setlinewidth\
-    \/constraint\
-    \{\
-    \    0 setgray\
-    \    w mul 8 add exch nr exch sub 1 sub w mul 6.5 add moveto show\
-    \} def\
-    \/segment\
-    \{\
-    \    0 0 .5 setrgbcolor\
-    \    w mul exch nr exch sub w mul moveto\
-    \    w mul exch nr exch sub w mul lineto\
-    \    stroke\
-    \} def\
+    \/w 22 def\n\
+    \1 setlinewidth\n\
+    \2 setlinecap\n\
+    \.7 setgray\n\
+    \2 2 translate\n\
+    \0 0 moveto\n\
+    \nc w mul 0 lineto\n\
+    \nc w mul nr w mul lineto\n\
+    \0 nr w mul lineto\n\
+    \closepath\n\
+    \stroke\n\
+    \1 1 nc 1 sub % for\n\
+    \{\n\
+    \    w mul 0 moveto\n\
+    \    0 nr w mul rlineto\n\
+    \    stroke\n\
+    \} for\n\
+    \1 1 nr 1 sub % for\n\
+    \{\n\
+    \    w mul 0 exch moveto\n\
+    \    nc w mul 0 rlineto\n\
+    \    stroke\n\
+    \} for\n\
+    \0 1 nr % for\n\
+    \{\n\
+    \    0 1 nc % for\n\
+    \    {\n\
+    \        w mul 1 index w mul 1.5 0 360 arc closepath fill\n\
+    \    } for\n\
+    \    pop\n\
+    \} for\n\
+    \/Helvetica findfont 12 scalefont setfont\n\
+    \1.5 setlinewidth\n\
+    \/constraint\n\
+    \{\n\
+    \    0 setgray\n\
+    \    w mul 8 add exch nr exch sub 1 sub w mul 6.5 add moveto show\n\
+    \} def\n\
+    \/segment\n\
+    \{\n\
+    \    0 0 .5 setrgbcolor\n\
+    \    w mul exch nr exch sub w mul moveto\n\
+    \    w mul exch nr exch sub w mul lineto\n\
+    \    stroke\n\
+    \} def\n\
     \"

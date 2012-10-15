@@ -116,7 +116,7 @@ showProblem p = unlines $ map oneLine [0 .. rn]
           oneLine r = concatMap (\c -> show (p!(r, c))) [0 .. cn]
 
 showProblemEPS :: Problem -> String
-showProblemEPS p = epsStr1 ++ show ((cn+1)*15+3) ++ " " ++ show ((rn+1)*15+3) ++ "\n"
+showProblemEPS p = epsStr1 ++ show ((cn+1)*22+4) ++ " " ++ show ((rn+1)*22+4) ++ "\n"
                 ++ "/nr " ++ show (rn+1) ++ " def\n"
                 ++ "/nc " ++ show (cn+1) ++ " def\n"
                 ++ epsStr2
@@ -148,10 +148,10 @@ epsStr1 =
 
 epsStr2 :: String
 epsStr2 =
-    "/w 15 def\n\
+    "/w 22 def\n\
     \1 setlinewidth\n\
     \.7 setgray\n\
-    \1.5 1.5 translate\n\
+    \2 2 translate\n\
     \0 0 moveto\n\
     \nc w mul 0 lineto\n\
     \nc w mul nr w mul lineto\n\
@@ -174,7 +174,7 @@ epsStr2 =
     \{\n\
     \    0 1 nc % for\n\
     \    {\n\
-    \        w mul 1 index w mul 1.5 0 360 arc fill\n\
+    \        w mul 1 index w mul 1.5 0 360 arc closepath fill\n\
     \    } for\n\
     \    pop\n\
     \} for\n\
@@ -182,5 +182,5 @@ epsStr2 =
     \0 setgray\n\
     \/constraint\n\
     \{\n\
-    \    w mul 4.5 add exch nr exch sub 1 sub w mul 3 add moveto show\n\
+    \    w mul 8 add exch nr exch sub 1 sub w mul 6.5 add moveto show\n\
     \} def\n"

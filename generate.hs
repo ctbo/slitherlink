@@ -99,9 +99,8 @@ generate nr nc gen = foldl remove (problem, head (solve problem)) $ zip perm [le
           problem = makeProblem inside
           remove (p, s) (i, t) = let p' = p // [(i, Unconstrained)]
                                  in case solve p' of
-                                    _:_:_ -> trace ("- " ++ show t) (p, s)
                                     [s'] -> trace (showProblem p' ++ "+ " ++ show t) (p', s')
-                                    _ -> undefined -- no solution; shouldn't happen
+                                    _    -> trace ("- " ++ show t) (p, s)
 
 makeProblem :: Inside -> Problem
 makeProblem ins = array ((0, 0), (sRows ins - 1, sColumns ins - 1)) 

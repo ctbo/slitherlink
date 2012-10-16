@@ -230,7 +230,7 @@ showStateEPS (State cells _) = epsStr1 ++ header ++ epsStr2 ++ concatMap stuff (
     where ((0, 0), (rn, cn)) = bounds cells
           nr = rn `div` 2
           nc = cn `div` 2
-          header = show (nc * 22 + 4) ++ " " ++ show (nr * 22 + 4) ++ "\n"
+          header = show (nc * 22 + 22) ++ " " ++ show (nr * 22 + 22) ++ "\n"
                 ++ "/nr " ++ show nr ++ " def\n"
                 ++ "/nc " ++ show nc ++ " def\n"
           stuff ((r, c), (Space _ (Just (Exactly n)))) = "(" ++ show n ++ ") " 
@@ -248,7 +248,7 @@ showProblem p = unlines $ map oneLine [0 .. rn]
           oneLine r = concatMap (\c -> show (p!(r, c))) [0 .. cn]
 
 showProblemEPS :: Problem -> String
-showProblemEPS p = epsStr1 ++ show ((cn+1)*22+4) ++ " " ++ show ((rn+1)*22+4) ++ "\n"
+showProblemEPS p = epsStr1 ++ show ((cn+1)*22+22) ++ " " ++ show ((rn+1)*22+22) ++ "\n"
                 ++ "/nr " ++ show (rn+1) ++ " def\n"
                 ++ "/nc " ++ show (cn+1) ++ " def\n"
                 ++ epsStr2
@@ -268,10 +268,12 @@ epsStr2 :: String
 epsStr2 =
     "\
     \/w 22 def\n\
+    \.8 .9 1 setrgbcolor\n\
+    \0 0 moveto nc 1 add w mul dup 0 lineto nr 1 add w mul lineto 0 nr 1 add w mul lineto closepath fill\n\
     \1 setlinewidth\n\
     \2 setlinecap\n\
-    \.7 setgray\n\
-    \2 2 translate\n\
+    \.6 setgray\n\
+    \11 11 translate\n\
     \0 0 moveto\n\
     \nc w mul 0 lineto\n\
     \nc w mul nr w mul lineto\n\
@@ -294,12 +296,12 @@ epsStr2 =
     \{\n\
     \    0 1 nc % for\n\
     \    {\n\
-    \        w mul 1 index w mul 1.5 0 360 arc closepath fill\n\
+    \        w mul 1 index w mul 2 0 360 arc closepath fill\n\
     \    } for\n\
     \    pop\n\
     \} for\n\
     \/Helvetica findfont 12 scalefont setfont\n\
-    \1.5 setlinewidth\n\
+    \2 setlinewidth\n\
     \/constraint\n\
     \{\n\
     \    0 setgray\n\
